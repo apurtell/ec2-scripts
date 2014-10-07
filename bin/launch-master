@@ -9,7 +9,7 @@ zone=
 ami=
 keypair=`whoami`
 
-while [ $# -gt 0 ] ; do
+while [[ $# -gt 0 ]] ; do
   case "$1" in
     -t | --type)           type="$2"; shift;;
     -m | --monitoring)     monitoring=yes;;
@@ -28,20 +28,16 @@ done
 bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
 export bin
-if [ -f "$bin"/credentials.sh ] ; then
-  source "$bin"/credentials.sh
-fi
+[[ -f "$bin"/credentials.sh ]] && source "$bin"/credentials.sh
 source "$bin"/env.sh
 
 echo "TYPE: $type"
 
-if [ ! -z $ami ] ; then
-  AMI=$ami
-fi
+[[ ! -z $ami ]] && AMI=$ami
 
 echo "AMI: $AMI"
 
-[ -z $AMI ] && echo "No AMI found" && exit 1
+[[ -z $AMI ]] && echo "No AMI found" && exit 1
 
 rm -f /tmp/userdata$$
 echo "#!/bin/bash" >> /tmp/userdata$$
@@ -56,12 +52,8 @@ gzip -9 /tmp/userdata$$
 CMD="ec2-run-instances $AMI $TOOL_OPTS -k $keypair -t $type -g $secgroup --placement-group $placementgroup -f /tmp/userdata$$.gz"
 # need to specify ephemeral drive mappings or they won't appear
 CMD="$CMD -b /dev/sdb=ephemeral0 -b /dev/sdc=ephemeral1 -b /dev/sdd=ephemeral2 -b /dev/sde=ephemeral3"
-if [ ! -z "$monitoring" ] ; then
-  CMD="$CMD -m"
-fi
-if [ ! -z "$zone" ] ; then
-  CMD="$CMD -z $zone"
-fi
+[[ ! -z "$monitoring" ]] && CMD="$CMD -m"
+[[ ! -z "$zone" ]] && CMD="$CMD -z $zone"
 OUTPUT=`$CMD`
 INSTANCE=`echo $OUTPUT | awk '{print $6}'`
 echo $OUTPUT
@@ -72,9 +64,7 @@ echo -n "Polling server status "
 while true; do
   printf "."
   HOSTNAME=`ec2-describe-instances $TOOL_OPTS $INSTANCE | grep running | awk '{print $4}'`
-  if [ ! -z $HOSTNAME ] ; then
-    break;
-  fi
+  [[ ! -z $HOSTNAME ]] && break;
   sleep 1
 done
 echo
@@ -83,7 +73,7 @@ echo -n "Uploading private key "
 while true ; do
   printf "."
   scp $SSH_OPTS $EC2_PRIVATE_KEY ec2-user@$HOSTNAME:~/.ssh/identity > /dev/null 2>&1
-  [ $? -eq 0 ] && break
+  [[ $? -eq 0 ]] && break
   sleep 1
 done
 echo

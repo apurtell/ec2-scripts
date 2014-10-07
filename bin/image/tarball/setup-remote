@@ -115,16 +115,14 @@ echo "@hadoop hard nproc 65536" >> /etc/security/limits.conf
 echo "fs.file-max = 65536" >> /etc/sysctl.conf
 echo "vm.swappiness = 0" >> /etc/sysctl.conf
 
-[ ! -f /etc/hosts ] &&  echo "127.0.0.1 localhost" > /etc/hosts
+[[ ! -f /etc/hosts ]] &&  echo "127.0.0.1 localhost" > /etc/hosts
 
 # helper wrapper for init
 cat > /usr/bin/klogin <<EOF
 #!/bin/bash
 user=\$1
 host=\`hostname -f\`
-if [ -z "\$user" ] ; then
-  user=\`whoami\`
-fi
+[[ -z "\$user" ]] && user=\`whoami\`
 case \$user in
   hdfs|hadoop)
     kinit -k -t /etc/hadoop/conf/\$user.keytab \$user/\$host && kinit -R
@@ -152,7 +150,7 @@ echo "$HOST_IP $HOSTNAME" >> /etc/hosts
 
 # Configure Kerberos
 
-if [ "$IS_MASTER" = "true" ]; then
+if [[ "$IS_MASTER" = "true" ]]; then
 
 ####################
 # KDC.CONF
@@ -263,7 +261,7 @@ EOF
 
 KDC_MASTER_PASS="EiSei0Da"
 KDC_ADMIN_PASS="Chohpet6"
-if [ "$IS_MASTER" = "true" ]; then
+if [[ "$IS_MASTER" = "true" ]]; then
   kdc_setup $KDC_MASTER_PASS $KDC_ADMIN_PASS
   echo "Waiting 10 seconds for KDC"
   sleep 10
@@ -292,7 +290,7 @@ chown -R hbase:hadoop $m/zk
 DFS_NAME_DIR="$m/dfs/name"
 DFS_DATA_DIR="$m/dfs/data"
 mkfs.xfs -f /dev/xvdc
-if [ $? -eq 0 ] ; then
+if [[ $? -eq 0 ]] ; then
   m="/media/ephemeral1"
   mkdir -p $m
   mount -o $mountopts /dev/xvdc $m
@@ -305,7 +303,7 @@ if [ $? -eq 0 ] ; then
   i=2
   for d in d e f g h i ; do
     mkfs.xfs -f /dev/xvd${d}
-    if [ $? -eq 0 ] ; then
+    if [[ $? -eq 0 ]] ; then
       m="/media/ephemeral${i}"
       mkdir -p $m
       mount -o $mountopts /dev/xvd${d} $m

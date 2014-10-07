@@ -12,7 +12,7 @@ ami=
 on_demand=
 keypair=`whoami`
 
-while [ $# -gt 0 ] ; do
+while [[ $# -gt 0 ]] ; do
   case "$1" in
     -t | --type)           type="$2"; shift;;
     -h | --hosts)          nrhosts="$2"; shift;;
@@ -31,14 +31,14 @@ while [ $# -gt 0 ] ; do
   shift
 done
 
-if [ $# -gt 0 ] ; then
+if [[ $# -gt 0 ]] ; then
   MASTER_HOST=$1
   shift
 else
   echo "usage: launch-aux <master> <count>" && exit 1
 fi
 
-if [ $# -gt 0 ] ; then
+if [[ $# -gt 0 ]] ; then
   nrhosts=$1
   shift
 else
@@ -48,21 +48,17 @@ fi
 bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
 export bin
-if [ -f "$bin"/credentials.sh ] ; then
-  source "$bin"/credentials.sh
-fi
+[[ -f "$bin"/credentials.sh ]] && source "$bin"/credentials.sh
 source "$bin"/env.sh
 
 echo "TYPE: $type"
 echo "MASTER_HOST: $MASTER_HOST"
 
-if [ ! -z $ami ] ; then
-  AMI=$ami
-fi
+[[ ! -z $ami ]] && AMI=$ami
 
 echo "AMI: $AMI"
 
-[ -z $AMI ] && echo "No AMI found" && exit 1
+[[ -z $AMI ]] && echo "No AMI found" && exit 1
 
 rm -f /tmp/userdata$$
 echo "#!/bin/bash" >> /tmp/userdata$$
@@ -75,19 +71,15 @@ cat "$bin"/image/tarball/setup-remote >> /tmp/userdata$$
 cat "$bin"/image/tarball/setup-aux-remote.post >> /tmp/userdata$$
 gzip -9 /tmp/userdata$$
 
-if [ ! -z "$on_demand" ] ; then
+if [[ ! -z "$on_demand" ]] ; then
   CMD="ec2-run-instances $AMI $TOOL_OPTS -n $nrhosts -k $keypair -t $type -g $secgroup --placement-group $placementgroup -f /tmp/userdata$$.gz"
 else
   CMD="ec2-request-spot-instances $AMI $TOOL_OPTS -n $nrhosts -k $keypair -t $type -g $secgroup --placement-group $placementgroup -p $price -f /tmp/userdata$$.gz"
 fi
 # need to specify ephemeral drive mappings or they won't appear
 CMD="$CMD -b /dev/sdb=ephemeral0 -b /dev/sdc=ephemeral1 -b /dev/sdd=ephemeral2 -b /dev/sde=ephemeral3"
-if [ ! -z "$monitoring" ] ; then
-  CMD="$CMD -m"
-fi
-if [ ! -z "$zone" ] ; then
-  CMD="$CMD -z $zone"
-fi
+[[ ! -z "$monitoring" ]] && CMD="$CMD -m"
+[[ ! -z "$zone" ]] && CMD="$CMD -z $zone"
 OUTPUT=`$CMD`
 echo $OUTPUT
 
