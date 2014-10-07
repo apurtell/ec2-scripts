@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+bin=`dirname "$0"`
+bin=`cd "$bin"; pwd`
+export bin
+if [ -f "$bin"/credentials.sh ] ; then
+  source "$bin"/credentials.sh
+fi
+. "$bin"/env.sh
+
+MASTER_HOST=$1
+shift
+
+[ -z $MASTER_HOST ] && echo "usage: ssh-master <host>" && exit 1
+
+ssh $SSH_OPTS -D 1081 ec2-user@$MASTER_HOST $@

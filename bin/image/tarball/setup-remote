@@ -1,0 +1,945 @@
+####################
+# Update Yum
+
+echo "Enabling EPEL repository"
+sed -i -e s/enabled=0/enabled=1/ /etc/yum.repos.d/epel.repo
+echo "Updating YUM"
+yum -y update yum
+yum -y update
+
+####################
+# Install Java
+
+echo "Installing Java"
+mkdir -p /usr/java
+cd /usr/java
+wget -O java.tar.gz $JAVA_URL
+tar xzf java.tar.gz
+rm -f java.tar.gz
+ln -s `find . -maxdepth 1 -name 'jdk*' -type d` latest
+cat > /etc/profile.d/java.sh <<EOF
+export JAVA_HOME=/usr/java/latest
+export PATH=\$JAVA_HOME/bin:\$PATH
+EOF
+chmod 755 /etc/profile.d/java.sh
+
+export JAVA_HOME=/usr/java/latest
+export PATH=$JAVA_HOME/bin:$PATH
+
+####################
+# Install global deps
+
+echo "Installing RPMs"
+yum -y install jsvc screen ganglia-gmetad ganglia-gmond ganglia-web httpd php lzo xfsprogs krb5-server krb5-workstation
+
+export JSVC_HOME=/usr/bin
+
+####################
+# Set up user accounts
+
+echo "Configuring user accounts"
+groupadd hadoop
+useradd hadoop -g hadoop
+useradd hdfs
+useradd hbase
+usermod -a -G hadoop hdfs
+usermod -a -G hadoop hbase
+# root user needs to be in hadoop group for correct ulimits on datanodes
+usermod -a -G hadoop root
+# make sure daemon users can log in
+usermod -s /bin/bash -U hadoop
+usermod -s /bin/bash -U hbase
+usermod -s /bin/bash -U hdfs
+
+####################
+# Install Hadoop
+
+echo "Installing Hadoop $HADOOP_VERSION."
+cd /usr/lib
+wget -O hadoop.tgz $HADOOP_URL
+tar xzf hadoop.tgz
+rm -f hadoop.tgz
+ln -s `find . -maxdepth 1 -name 'hadoop*' -type d` hadoop
+mkdir /var/log/hadoop /var/run/hadoop
+chown hdfs:hadoop /var/log/hadoop /var/run/hadoop
+chmod 775 /var/log/hadoop /var/run/hadoop
+ln -s /var/log/hadoop /usr/lib/hadoop/logs
+# Relocate configuration
+mkdir -p /etc/hadoop/conf
+cp -a hadoop/etc/hadoop/* /etc/hadoop/conf/
+rm -rf /usr/lib/hadoop/etc/hadoop
+ln -s /etc/hadoop/conf /usr/lib/hadoop/etc/hadoop
+# make sure permissions are correct in /var/run
+chown root:hadoop /var/run/hadoop
+chmod 755 /var/run/hadoop
+mkdir -p /var/run/hadoop/socket
+chown hdfs:hadoop /var/run/hadoop/socket
+
+####################
+# Install HBase
+
+echo "Installing HBase $HBASE_VERSION."
+cd /usr/lib
+wget -O hbase.tgz $HBASE_URL
+tar xzf hbase.tgz
+rm -f hbase.tgz
+ln -s `find . -maxdepth 1 -name 'hbase*' -type d` hbase
+mkdir /var/log/hbase /var/run/hbase
+chown hbase:hadoop /var/log/hbase /var/run/hbase
+chmod 775 /var/log/hbase /var/run/hbase
+ln -s /var/log/hbase /usr/lib/hbase/logs
+# replace lib/native with a symlink to Hadoop native libs
+rm -rf /usr/lib/hbase/lib/native
+mkdir -p /usr/lib/hbase/lib/native
+ln -s /usr/lib/hadoop/lib/native /usr/lib/hbase/lib/native/Linux-amd64-64
+# Relocate configuration
+mkdir -p /etc/hbase/conf
+cp -a hbase/conf/* /etc/hbase/conf/
+rm -rf /usr/lib/hbase/conf
+ln -s /etc/hbase/conf /usr/lib/hbase/conf
+# make sure permissions are correct in /var/run
+chown -R root:hbase /var/run/hbase*
+chmod 775 /var/run/hbase*
+
+cd ~
+
+####################
+# Configure system
+
+echo "Configuring system"
+
+echo "@hadoop soft nofile 65536" >> /etc/security/limits.conf
+echo "@hadoop hard nofile 65536" >> /etc/security/limits.conf
+echo "@hadoop soft nproc 65536" >> /etc/security/limits.conf
+echo "@hadoop hard nproc 65536" >> /etc/security/limits.conf
+echo "fs.file-max = 65536" >> /etc/sysctl.conf
+echo "vm.swappiness = 0" >> /etc/sysctl.conf
+
+[ ! -f /etc/hosts ] &&  echo "127.0.0.1 localhost" > /etc/hosts
+
+# helper wrapper for init
+cat > /usr/bin/klogin <<EOF
+#!/bin/bash
+user=\$1
+host=\`hostname -f\`
+if [ -z "\$user" ] ; then
+  user=\`whoami\`
+fi
+case \$user in
+  hdfs|hadoop)
+    kinit -k -t /etc/hadoop/conf/\$user.keytab \$user/\$host && kinit -R
+    ;;
+  hbase)
+    kinit -k -t /etc/hbase/conf/\$user.keytab \$user/\$host && kinit -R
+    ;;
+  *)
+    echo "No keytab for user \$user"
+    ;;
+esac
+EOF
+chmod 755 /usr/bin/klogin
+
+# Make sure some important settings are in effect
+
+ulimit -n 65536
+ulimit -u 65536
+sysctl -p
+
+HOSTNAME=`hostname --fqdn | awk '{print tolower($1)}'`
+HOST_IP=$(host $HOSTNAME | awk '{print $4}')
+export USER="root"
+echo "$HOST_IP $HOSTNAME" >> /etc/hosts
+
+# Configure Kerberos
+
+if [ "$IS_MASTER" = "true" ]; then
+
+####################
+# KDC.CONF
+#
+
+  cat > /var/kerberos/krb5kdc/kdc.conf <<EOF
+[kdcdefaults]
+  v4_mode = nopreauth
+  kdc_ports = 0
+  kdc_tcp_ports = 88
+[realms]
+  HADOOP.LOCALDOMAIN = {
+    master_key_type = des3-hmac-sha1
+    acl_file = /var/kerberos/krb5kdc/kadm5.acl
+    dict_file = /usr/share/dict/words
+    admin_keytab = /var/kerberos/krb5kdc/kadm5.keytab
+    supported_enctypes = des-cbc-md5:normal des-cbc-crc:normal des:normal des:v4 des:norealm des:onlyrealm
+    max_life = 1d 0h 0m 0s
+    max_renewable_life = 7d 0h 0m 0s
+  }
+EOF
+
+####################
+# KADM5 ACL
+
+  cat > /var/kerberos/krb5kdc/kadm5.acl <<EOF
+*/admin@HADOOP.LOCALDOMAIN    *
+EOF
+
+fi
+
+####################
+# KRB5 CONF
+
+cat > /etc/krb5.conf <<EOF
+[logging]
+  default = FILE:/var/log/krb5libs.log
+  kdc = FILE:/var/log/krb5kdc.log
+  admin_server = FILE:/var/log/kadmind.log
+[libdefaults]
+  default_realm = HADOOP.LOCALDOMAIN
+  dns_lookup_realm = false
+  dns_lookup_kdc = false
+  ticket_lifetime = 1d
+  renew_lifetime = 7d
+  forwardable = yes
+  proxiable = yes
+  udp_preference_limit = 1
+  extra_addresses = 127.0.0.1
+  kdc_timesync = 1
+  ccache_type = 4
+  allow_weak_crypto = true
+[realms]
+  HADOOP.LOCALDOMAIN = {
+    kdc = ${MASTER_HOST}:88
+    admin_server = ${MASTER_HOST}:749
+  }
+[domain_realm]
+  localhost = HADOOP.LOCALDOMAIN
+  .compute-1.internal = HADOOP.LOCALDOMAIN
+  .internal = HADOOP.LOCALDOMAIN
+  internal = HADOOP.LOCALDOMAIN
+[appdefaults]
+  pam = {
+    debug = false
+    ticket_lifetime = 36000
+    renew_lifetime = 36000
+    forwardable = true
+    krb4_convert = false
+  }
+[login]
+  krb4_convert = true
+  krb4_get_tickets = false
+EOF
+
+    kdc_setup() {
+      kmasterpass=$1
+      kadmpass=$2
+      kdb5_util create -s -P ${kmasterpass}
+      service krb5kdc start
+      service kadmin start
+      kadmin.local <<EOF 
+        add_principal -pw $kadmpass kadmin/admin
+        add_principal -pw $kadmpass hadoop/admin
+        add_principal -pw $kadmpass hdfs
+        add_principal -pw $kadmpass hbase
+        quit
+EOF
+}
+
+    add_client() {
+      user=$1
+      pass=$2
+      kt=$3
+      host=$4
+      kadmin -p $user -w $pass <<EOF 
+        add_principal -randkey zookeeper/$host
+        add_principal -randkey hdfs/$host
+        add_principal -randkey hbase/$host
+        add_principal -randkey HTTP/$host
+        ktadd -k $kt zookeeper/$host
+        ktadd -k $kt hdfs/$host
+        ktadd -k $kt hbase/$host
+        ktadd -k $kt HTTP/$host
+        quit
+EOF
+     }
+
+KDC_MASTER_PASS="EiSei0Da"
+KDC_ADMIN_PASS="Chohpet6"
+if [ "$IS_MASTER" = "true" ]; then
+  kdc_setup $KDC_MASTER_PASS $KDC_ADMIN_PASS
+  echo "Waiting 10 seconds for KDC"
+  sleep 10
+fi
+mkdir -p /etc/hadoop/conf /etc/hbase/conf
+add_client "hadoop/admin" $KDC_ADMIN_PASS /etc/hadoop/conf/hdfs.keytab $HOSTNAME
+chown hdfs:hadoop /etc/hadoop/conf/hdfs.keytab
+cp /etc/hadoop/conf/hdfs.keytab /etc/hbase/conf/hbase.keytab
+chown hbase:hadoop /etc/hbase/conf/hbase.keytab
+chmod 640 /etc/hadoop/conf/*.keytab
+
+# Set up local directories for ZK, HDFS, and HBase
+
+# Set speculative allocation on data volumes to the HDFS block size
+mountopts="rw,noatime,nodiratime,allocsize=256m"
+
+m="/media/ephemeral0"
+umount $m
+mkfs.xfs -f /dev/xvdb
+mkdir -p $m
+mount -o $mountopts /dev/xvdb $m
+mkdir -p $m/dfs/data $m/zk
+chmod -R 0750 $m/dfs/data
+chown -R hdfs:hadoop $m/dfs
+chown -R hbase:hadoop $m/zk
+DFS_NAME_DIR="$m/dfs/name"
+DFS_DATA_DIR="$m/dfs/data"
+mkfs.xfs -f /dev/xvdc
+if [ $? -eq 0 ] ; then
+  m="/media/ephemeral1"
+  mkdir -p $m
+  mount -o $mountopts /dev/xvdc $m
+  mkdir -p $m/dfs/data $m/zk
+  chmod -R 0750 $m/dfs/data
+  chown -R hdfs:hadoop $m/dfs
+  chown -R hbase:hadoop $m/zk
+  DFS_NAME_DIR="$DFS_NAME_DIR,$m/dfs/name"
+  DFS_DATA_DIR="$DFS_DATA_DIR,$m/dfs/data"
+  i=2
+  for d in d e f g h i ; do
+    mkfs.xfs -f /dev/xvd${d}
+    if [ $? -eq 0 ] ; then
+      m="/media/ephemeral${i}"
+      mkdir -p $m
+      mount -o $mountopts /dev/xvd${d} $m
+      mkdir -p $m/dfs/data
+      chmod -R 0750 $m/dfs/data
+      chown -R hdfs:hadoop $m/dfs
+      DFS_DATA_DIR="$DFS_DATA_DIR,$m/dfs/data"
+      i=$(( i + 1 ))
+    else
+      break
+    fi
+  done
+fi
+DFS_NAMESECONDARY_DIR=`echo $DFS_NAME_DIR | sed -e 's/name/namesecondary/'`
+
+# Set up Hadoop configuration
+
+kinit=`which kinit`
+
+####################
+# HADOOP ENV
+#
+
+cat > /etc/hadoop/conf/hadoop-env.sh <<EOF
+export JAVA_HOME=/usr/java/latest
+export HADOOP_OPTS="\$HADOOP_OPTS -Djavax.security.auth.useSubjectCredsOnly=false"
+export HADOOP_NAMENODE_OPTS="\$HADOOP_NAMENODE_OPTS -Xms4g -Xmx4g"
+export HADOOP_NAMENODE_OPTS="\$HADOOP_NAMENODE_OPTS -XX:+UseConcMarkSweepGC"
+export HADOOP_NAMENODE_OPTS="\$HADOOP_NAMENODE_OPTS -XX:+UseParNewGC"
+export HADOOP_NAMENODE_OPTS="\$HADOOP_NAMENODE_OPTS -XX:+CMSClassUnloadingEnabled"
+export HADOOP_NAMENODE_OPTS="\$HADOOP_NAMENODE_OPTS -verbose:gc -Xloggc:/var/log/hadoop/hdfs-namenode-gc.log"
+export HADOOP_NAMENODE_OPTS="\$HADOOP_NAMENODE_OPTS -XX:+PrintGCDetails"
+export HADOOP_NAMENODE_OPTS="\$HADOOP_NAMENODE_OPTS -XX:+PrintAdaptiveSizePolicy"
+export HADOOP_NAMENODE_OPTS="\$HADOOP_NAMENODE_OPTS -XX:+PrintReferenceGC"
+export HADOOP_NAMENODE_OPTS="\$HADOOP_NAMENODE_OPTS -XX:+ParallelRefProcEnabled"
+export HADOOP_NAMENODE_OPTS="\$HADOOP_NAMENODE_OPTS -XX:ParallelGCThreads=16"
+export HADOOP_SECONDARYNAMENODE_OPTS="\$HADOOP_SECONDARYNAMENODE_OPTS -Xms4g -Xmx4g"
+export HADOOP_SECONDARYNAMENODE_OPTS="\$HADOOP_SECONDARYNAMENODE_OPTS -XX:+UseConcMarkSweepGC"
+export HADOOP_SECONDARYNAMENODE_OPTS="\$HADOOP_SECONDARYNAMENODE_OPTS -XX:+UseParNewGC"
+export HADOOP_SECONDARYNAMENODE_OPTS="\$HADOOP_SECONDARYNAMENODE_OPTS -XX:+CMSClassUnloadingEnabled"
+export HADOOP_DATANODE_OPTS="\$HADOOP_DATANODE_OPTS -Xms1g -Xmx1g"
+export HADOOP_DATANODE_OPTS="\$HADOOP_DATANODE_OPTS -XX:+UseConcMarkSweepGC"
+export HADOOP_DATANODE_OPTS="\$HADOOP_DATANODE_OPTS -XX:+UseParNewGC"
+export HADOOP_DATANODE_OPTS="\$HADOOP_DATANODE_OPTS -XX:+CMSClassUnloadingEnabled"
+export HADOOP_NAMENODE_USER=hdfs
+export HADOOP_SECONDARYNAMENODE_USER=hdfs
+export HADOOP_DATANODE_USER=hdfs
+export HADOOP_SECURE_DN_USER=hdfs
+EOF
+
+####################
+# CORE SITE
+
+cat > /etc/hadoop/conf/core-site.xml <<EOF
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+<property>
+ <name>fs.default.name</name>
+ <value>hdfs://$MASTER_HOST:8020</value>
+</property>
+<property>
+ <name>hadoop.security.authentication</name>
+ <value>kerberos</value>
+</property>
+<property>
+ <name>hadoop.security.authorization</name>
+ <value>true</value>
+</property>
+<property>
+ <name>hadoop.kerberos.kinit.command</name>
+ <value>$kinit</value>
+</property>
+<property>
+ <name>ipc.server.tcpnodelay</name>
+ <value>true</value>
+</property>
+<property>
+ <name>ipc.client.tcpnodelay</name>
+ <value>true</value>
+</property>
+</configuration>
+EOF
+
+####################
+# HDFS SITE
+
+cat > /etc/hadoop/conf/hdfs-site.xml <<EOF
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+<property>
+ <name>fs.default.name</name>
+ <value>hdfs://$MASTER_HOST:8020</value>
+</property>
+<property>
+ <name>dfs.name.dir</name>
+ <value>$DFS_NAME_DIR</value>
+</property>
+<property>
+ <name>dfs.data.dir</name>
+ <value>$DFS_DATA_DIR</value>
+</property>
+<property>
+ <name>dfs.secondary.namenode.name.dir</name>
+ <value>$DFS_NAMESECONDARY_DIR</value>
+</property>
+<property>
+ <name>dfs.support.append</name>
+ <value>true</value>
+</property>
+<property>
+ <name>dfs.replication</name>
+ <value>3</value>
+</property>
+<property>
+ <name>dfs.datanode.max.xcievers</name>
+ <value>8096</value>
+</property>
+<property>
+ <name>dfs.block.size</name>
+ <value>268435456</value>
+</property>
+<property>
+ <name>dfs.datanode.synconclose</name>
+ <value>true</value>
+</property>
+<property>
+ <name>dfs.datanode.sync.behind.writes</name>
+ <value>true</value>
+</property>
+<property>
+ <name>dfs.namenode.avoid.stale.read.datanode</name>
+ <value>true</value>
+</property>
+<property>
+ <name>dfs.namenode.avoid.stale.write.datanode</name>
+ <value>true</value>
+</property>
+<property>
+ <name>dfs.datanode.data.dir.perm</name>
+ <value>750</value> 
+</property>
+<property>
+ <name>dfs.datanode.address</name>
+ <value>0.0.0.0:1004</value>
+</property>
+<property>
+ <name>dfs.datanode.http.address</name>
+ <value>0.0.0.0:1006</value>
+</property>
+<property>
+ <name>dfs.datanode.https.address</name>
+ <value>0.0.0.0:1005</value>
+</property>
+<property>
+ <name>ignore.secure.ports.for.testing</name>
+ <value>true</value>
+</property>
+<property>
+ <name>dfs.namenode.http-address</name>
+ <value>$MASTER_HOST:8070</value>
+</property>
+<property>
+ <name>dfs.namenode.https-address</name>
+ <value>$MASTER_HOST:8090</value>
+</property>
+<property>
+ <name>dfs.namenode.https.port</name>
+ <value>8090</value>
+</property>
+<property>
+ <name>dfs.secondary.http.address</name>
+ <value>0.0.0.0:0</value>
+</property>
+<property>
+ <name>dfs.secondary.https.address</name>
+ <value>0.0.0.0:8092</value>
+</property>
+<property>
+ <name>dfs.secondary.https.port</name>
+ <value>8092</value>
+</property>
+<property>
+ <name>dfs.namenode.handler.count</name>
+ <value>100</value>
+</property>
+<property>
+ <name>dfs.client.block.write.replace-datanode-on-failure.enable</name>
+ <value>false</value>
+</property>
+<property>
+ <name>dfs.client.read.shortcircuit</name>
+ <value>true</value>
+</property>
+<property>
+ <name>dfs.client.domain.socket.data.traffic</name>
+ <value>true</value>
+</property>
+<property>
+ <name>dfs.domain.socket.path</name>
+ <value>/var/run/hadoop/socket/domain.socket</value>
+</property>
+<property>
+ <name>dfs.webhdfs.enabled</name>
+ <value>false</value>
+</property>
+<property>
+ <name>dfs.namenode.user.name</name>
+ <value>hdfs</value>
+</property>
+<property>
+ <name>dfs.namenode.keytab.file</name>
+ <value>/etc/hadoop/conf/hdfs.keytab</value>
+</property>	
+<property>
+ <name>dfs.namenode.kerberos.principal</name>
+ <value>hdfs/_HOST@HADOOP.LOCALDOMAIN</value>
+</property>
+<property>
+ <name>dfs.secondary.namenode.kerberos.internal.spnego.principal</name>
+ <value>HTTP/_HOST@HADOOP.LOCALDOMAIN</value>
+</property>
+<property>
+ <name>dfs.secondary.namenode.user.name</name>
+ <value>hdfs</value>
+</property>
+<property>
+ <name>dfs.secondary.namenode.keytab.file</name>
+ <value>/etc/hadoop/conf/hdfs.keytab</value>
+</property>	
+<property>
+ <name>dfs.secondary.namenode.kerberos.principal</name>
+ <value>hdfs/_HOST@HADOOP.LOCALDOMAIN</value>
+</property>
+<property>
+ <name>dfs.secondary.namenode.kerberos.internal.spnego.principal</name>
+ <value>HTTP/_HOST@HADOOP.LOCALDOMAIN</value>
+</property>
+<property>
+ <name>dfs.web.authentication.kerberos.keytab</name>
+ <value>/etc/hadoop/conf/hdfs.keytab</value>
+</property>
+<property>
+ <name>dfs.web.authentication.kerberos.principal</name>
+ <value>HTTP/_HOST@HADOOP.LOCALDOMAIN</value>
+</property>
+<property>
+ <name>dfs.datanode.keytab.file</name>
+ <value>/etc/hadoop/conf/hdfs.keytab</value>
+</property>	
+<property>
+ <name>dfs.datanode.kerberos.principal</name>
+ <value>hdfs/_HOST@HADOOP.LOCALDOMAIN</value>
+</property>
+<property>
+ <name>dfs.datanode.kerberos.https.principal</name>
+ <value>host/_HOST@HADOOP.LOCALDOMAIN</value>
+</property>
+<property>
+ <name>dfs.block.access.token.enable</name>
+ <value>true</value>
+</property>
+</configuration>
+EOF
+
+# Set up HBase configuration
+
+####################
+# HBASE ENV
+
+cat >> /etc/hbase/conf/hbase-env.sh <<EOF
+export JAVA_HOME=/usr/java/latest
+
+export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -Xms4g -Xmx4g"
+export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -Xmn256m"
+export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -XX:+UseConcMarkSweepGC"
+export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -XX:+UseParNewGC"
+export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -XX:+CMSClassUnloadingEnabled"
+export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -verbose:gc -Xloggc:/var/log/hbase/hbase-master-gc.log"
+export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -XX:+PrintGCDetails"
+export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -XX:+PrintAdaptiveSizePolicy"
+export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -XX:+PrintReferenceGC"
+export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -XX:+ParallelRefProcEnabled"
+export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -XX:ParallelGCThreads=16"
+
+export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -Xms8g -Xmx8g"
+export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -Xmn256m"
+export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:MaxDirectMemorySize=24g"
+export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:+UseConcMarkSweepGC"
+export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:+UseParNewGC"
+export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:+CMSClassUnloadingEnabled"
+export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -verbose:gc -Xloggc:/var/log/hbase/hbase-regionserver-gc.log"
+export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:+PrintGCDetails"
+export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:+PrintAdaptiveSizePolicy"
+export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:+PrintReferenceGC"
+export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:+ParallelRefProcEnabled"
+export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:ParallelGCThreads=16"
+
+export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -Xms1g -Xmx1g"
+export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -Xmn64m"
+export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -XX:+UseConcMarkSweepGC"
+export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -XX:+UseParNewGC"
+export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -XX:+CMSClassUnloadingEnabled"
+export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -verbose:gc -Xloggc:/var/log/hbase/hbase-zookeeper-gc.log"
+export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -XX:+PrintGCDetails"
+export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -XX:+PrintAdaptiveSizePolicy"
+export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -XX:+PrintReferenceGC"
+export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -XX:+ParallelRefProcEnabled"
+export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -XX:ParallelGCThreads=16"
+export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -Dzookeeper.kerberos.removeHostFromPrincipal=true"
+export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -Dzookeeper.kerberos.removeRealmFromPrincipal=true"
+EOF
+
+####################
+# HBASE SITE
+
+cp -a /etc/hadoop/conf/configuration.xsl /etc/hbase/conf
+cat > /etc/hbase/conf/hbase-site.xml <<EOF
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+<property>
+ <name>hbase.rootdir</name>
+ <value>hdfs://$MASTER_HOST:8020/hbase</value>
+</property>
+<property>
+ <name>hbase.zookeeper.quorum</name>
+ <value>$MASTER_HOST</value>
+</property>
+<property>
+ <name>hbase.cluster.distributed</name>
+ <value>true</value>
+</property>
+<property>
+ <name>hbase.replication</name>
+ <value>true</value>
+</property>
+<property>
+ <name>hbase.master.port</name>
+ <value>8100</value>
+</property>
+<property>
+ <name>hbase.master.info.port</name>
+ <value>8110</value>
+</property>
+<property>
+ <name>hbase.regionserver.port</name>
+ <value>8120</value>
+</property>
+<property>
+ <name>hbase.regionserver.info.port</name>
+ <value>8130</value>
+</property>
+<property>
+ <name>hbase.hregion.majorcompaction</name>
+ <value>0</value>
+</property>
+<property>
+  <name>ipc.server.tcpnodelay</name>
+  <value>true</value>
+</property>
+<property>
+  <name>hbase.ipc.client.tcpnodelay</name>
+  <value>true</value>
+</property>
+<property>
+  <name>hbase.zookeeper.useMulti</name>
+  <value>true</value>
+</property>
+<property>
+ <name>zookeeper.session.timeout</name>
+ <value>60000</value>
+</property>
+<property>
+ <name>hbase.zookeeper.property.dataDir</name>
+ <value>/media/ephemeral0/zk</value>
+</property>
+<property>
+ <name>hbase.zookeeper.property.maxClientCnxns</name>
+ <value>1000</value>
+</property>
+<!-- we need to set this high in case the master node is up for a while
+  before any slaves are launched in EC2 test clusters -->
+<property>
+ <name>hbase.server.versionfile.writeattempts</name>
+ <value>100</value>
+</property>
+<property>
+ <name>hbase.it.clustermanager.ssh.cmd</name>
+ <value>/usr/bin/ssh %1$s %2$s%3$s%4$s "su hbase - -c \"%5$s\""</value>
+</property>
+<property>
+ <name>hbase.it.clustermanager.hbase.home</name>
+ <value>/usr/lib/hbase</value>
+</property>
+<property>
+ <name>hbase.it.clustermanager.hbase.conf.dir</name>
+ <value>/etc/hbase/conf</value>
+</property>
+<property>
+ <name>hbase.bucketcache.ioengine</name>
+ <value>offheap</value>
+</property>
+<property>
+ <name>hbase.bucketcache.size</name>
+ <value>0.9</value>
+</property>
+<property>
+ <name>dfs.client.block.write.replace-datanode-on-failure.enable</name>
+ <value>false</value>
+</property>
+<property>
+ <name>dfs.client.read.shortcircuit</name>
+ <value>true</value>
+</property>
+<property>
+ <name>dfs.client.domain.socket.data.traffic</name>
+ <value>true</value>
+</property>
+<property>
+ <name>dfs.domain.socket.path</name>
+ <value>/var/run/hadoop/socket/domain.socket</value>
+</property>
+<property>
+ <name>dfs.client.read.shortcircuit.buffer.size</name>
+ <value>131072</value>
+</property>
+<property>
+ <name>hbase.hstore.blockingStoreFiles</name>
+ <value>20</value>
+</property>
+<property>
+ <name>hbase.hstore.compactionThreshold</name>
+ <value>6</value>
+</property>
+<property>
+ <name>hbase.hregion.memstore.flush.size</name>
+ <value>268435456</value>
+</property>
+<property>
+ <name>hbase.hregion.max.filesize</name>
+ <value>21474836480</value>
+</property>
+<property>
+ <name>hbase.regionserver.maxlogs</name>
+ <value>64</value>
+</property>
+<property>
+ <name>hbase.regionserver.handler.count</name>
+ <value>20</value>
+</property>
+<property>
+ <name>hbase.regionserver.metahandler.count</name>
+ <value>20</value>
+</property>
+<property>
+ <name>hbase.regionserver.thread.compaction.large</name>
+ <value>2</value>
+</property>
+<property>
+ <name>hbase.regionserver.thread.compaction.small</name>
+ <value>5</value>
+</property>
+<property>
+ <name>hbase.regionserver.thread.split</name>
+ <value>2</value>
+</property>
+<property>
+ <name>hbase.regionserver.checksum.verify</name>
+ <value>true</value>
+</property>
+<property>
+ <name>hbase.regionserver.separate.hlog.for.meta</name>
+ <value>true</value>
+</property>
+<property>
+ <name>replication.source.ratio</name>
+ <value>0.15</value>
+</property>
+<property>
+ <name>hbase.rpc.timeout</name>
+ <value>120000</value>
+</property>
+<property>
+ <name>hbase.security.authentication</name>
+ <value>kerberos</value>
+</property>
+<property>
+ <name>hbase.master.keytab.file</name>
+ <value>/etc/hbase/conf/hbase.keytab</value>
+</property>	
+<property>
+ <name>hbase.master.kerberos.principal</name>
+ <value>hbase/_HOST@HADOOP.LOCALDOMAIN</value>
+</property>
+<property>
+ <name>hbase.master.kerberos.https.principal</name>
+ <value>host/_HOST@HADOOP.LOCALDOMAIN</value>
+</property>
+<property>
+ <name>hbase.regionserver.keytab.file</name>
+ <value>/etc/hbase/conf/hbase.keytab</value>
+</property>	
+<property>
+ <name>hbase.regionserver.kerberos.principal</name>
+ <value>hbase/_HOST@HADOOP.LOCALDOMAIN</value>
+</property>
+<property>
+ <name>hbase.regionserver.kerberos.https.principal</name>
+ <value>host/_HOST@HADOOP.LOCALDOMAIN</value>
+</property>
+<property>
+ <name>hbase.rest.keytab.file</name>
+ <value>/etc/hbase/conf/hbase.keytab</value>
+</property>
+<property>
+ <name>hbase.rest.kerberos.principal</name>
+ <value>hbase/_HOST@HADOOP.LOCALDOMAIN</value>
+</property>
+<property>
+ <name>hbase.zookeeper.server.keytab.file</name>
+ <value>/etc/hbase/conf/hbase.keytab</value>
+</property>
+<property>
+ <name>hbase.zookeeper.server.kerberos.principal</name>
+ <value>hbase/_HOST@HADOOP.LOCALDOMAIN</value>
+</property>
+<property>
+ <name>hbase.zookeeper.client.keytab.file</name>
+ <value>/etc/hbase/conf/hbase.keytab</value>
+</property>
+<property>
+ <name>hbase.zookeeper.client.kerberos.principal</name>
+ <value>hbase/_HOST@HADOOP.LOCALDOMAIN</value>
+</property>
+<property>
+ <name>hbase.zookeeper.property.authProvider.1</name>
+ <value>org.apache.zookeeper.server.auth.SASLAuthenticationProvider</value>
+</property>
+<property>
+ <name>hbase.zookeeper.property.kerberos.removeHostFromPrincipal</name>
+ <value>true</value>
+</property>
+<property>
+ <name>hbase.zookeeper.property.kerberos.removeRealmFromPrincipal</name>
+ <value>true</value>
+</property>
+<property>
+ <name>hbase.zookeeper.property.jaasLoginRenew</name>
+ <value>3600000</value>
+</property>
+</configuration>
+EOF
+
+ln -s /etc/hadoop/conf/core-site.xml /etc/hbase/conf/
+ln -s /etc/hadoop/conf/hdfs-site.xml /etc/hbase/conf/
+
+####################
+# IPC PROTOCOL ACLS
+
+cat > /etc/hbase/conf/hadoop-policy.xml <<EOF
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+<property>
+ <name>security.client.protocol.acl</name>
+ <value>*</value>
+</property>
+<property>
+ <name>security.admin.protocol.acl</name>
+ <value>*</value>
+</property>
+<property>
+ <name>security.masterregion.protocol.acl</name>
+ <value>*</value>
+</property>
+</configuration>
+EOF
+
+##########
+# HBASE LOG4J
+
+cat > /etc/hbase/conf/log4j.properties <<EOF
+hbase.root.logger=INFO,console
+hbase.security.logger=INFO,console
+hbase.security.log.file=SecurityAuth.audit
+hbase.log.dir=/var/log/hbase
+hbase.log.file=hbase.log
+log4j.rootLogger=\${hbase.root.logger}
+log4j.threshhold=ALL
+log4j.appender.DRFA=org.apache.log4j.DailyRollingFileAppender
+log4j.appender.DRFA.File=\${hbase.log.dir}/\${hbase.log.file}
+log4j.appender.DRFA.DatePattern=.yyyy-MM-dd
+log4j.appender.DRFA.layout=org.apache.log4j.PatternLayout
+log4j.appender.DRFA.layout.ConversionPattern=%d{ISO8601} %p %c: %m%n
+log4j.appender.NullAppender=org.apache.log4j.varia.NullAppender
+log4j.appender.console=org.apache.log4j.ConsoleAppender
+log4j.appender.console.target=System.err
+log4j.appender.console.layout=org.apache.log4j.PatternLayout
+log4j.appender.console.layout.ConversionPattern=%d{yy/MM/dd HH:mm:ss} %p %c{2}: %m%n
+hbase.log.maxfilesize=256MB
+hbase.log.maxbackupindex=20
+log4j.appender.RFA=org.apache.log4j.RollingFileAppender
+log4j.appender.RFA.File=\${hbase.log.dir}/\${hbase.log.file}
+log4j.appender.RFA.MaxFileSize=\${hbase.log.maxfilesize}
+log4j.appender.RFA.MaxBackupIndex=\${hbase.log.maxbackupindex}
+log4j.appender.RFA.layout=org.apache.log4j.PatternLayout
+log4j.appender.RFA.layout.ConversionPattern=%d{ISO8601} %-5p [%t] %c{2}: %m%n
+hbase.security.log.file=SecurityAuth.audit
+hbase.security.log.maxfilesize=256MB
+hbase.security.log.maxbackupindex=20
+log4j.appender.RFAS=org.apache.log4j.RollingFileAppender
+log4j.appender.RFAS.File=\${hbase.log.dir}/\${hbase.security.log.file}
+log4j.appender.RFAS.MaxFileSize=\${hbase.security.log.maxfilesize}
+log4j.appender.RFAS.MaxBackupIndex=\${hbase.security.log.maxbackupindex}
+log4j.appender.RFAS.layout=org.apache.log4j.PatternLayout
+log4j.appender.RFAS.layout.ConversionPattern=%d{ISO8601} %p %c: %m%n
+log4j.category.SecurityLogger=\${hbase.security.logger}
+log4j.additivity.SecurityLogger=false
+log4j.logger.org.apache.zookeeper=WARN
+log4j.logger.org.apache.hadoop.hbase=DEBUG
+EOF
+
+# Configure Ganglia
+
+sed -i -e "s|\( *mcast_join *=.*\)|#\1|" \
+  -e "s|\(udp_send_channel {\)|\1\n  host=$MASTER_HOST|" \
+  /etc/ganglia/gmond.conf
+
+cat > /etc/httpd/conf.d/ganglia.conf <<EOF
+Alias /ganglia /usr/share/ganglia
+<Location /ganglia>
+  Order deny,allow
+  Allow from all
+</Location>
+EOF

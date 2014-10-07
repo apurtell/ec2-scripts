@@ -1,0 +1,89 @@
+1. Configuration
+
+   Create a file bin/credentials.sh and configure it according to your
+   account details:
+
+     export AWS_ACCESS_KEY=AKIA....
+     export AWS_SECRET_KEY=BaXi....
+     export EC2_PRIVATE_KEY=/home/user/.ec2/pk.pem
+
+   Configure bin/env.sh
+
+     Set REGION to the region you would like to use.
+   
+2. Launch master
+
+   ./bin/launch-master [options]
+
+   where [options] can be one or more of:
+
+     -t <type>       instance type, default c3.4xlarge
+     -z <zone>       availability zone
+     -k <name>       keypair name, default "$USER"
+     -g <placement>  placement group, default "cluster"
+     -s <secgroup>   security group, default "default"
+     -m              enable monitoring, default no
+     --ami <id>      AMI ID
+
+   This command will print out the public DNS name of the master instance if
+   successfully launched.
+
+3. Launch slaves
+
+   ./bin/launch-slaves [options] <master> <num slaves>
+
+   where [options] can be one or more of:
+
+     -t <type>       instance type, default c3.8xlarge
+     -z <zone>       availability zone
+     -k <name>       keypair name, default "$USER"
+     -g <placement>  placement group, default "cluster"
+     -s <secgroup>   security group, default "default"
+     -o              on demand instance (otherwise, spot request), default no
+     -p <price>      spot request price, default $1.00
+     -m              enable monitoring, default no
+     --ami <id>      AMI ID
+
+   where <master> is the public DNS name of the master instance
+
+   where <num slaves> is the number of slaves to launch
+
+   More slaves can be launched at any time by executing bin/launch-slaves
+   again.
+
+4. SSH to the cluster
+
+   Typically you will want to log in to the master:
+
+   ./bin/ssh-cluster <master>
+
+   where <master> is the public DNS name of the master instance
+
+   Note you can use any public DNS name of any instance in the cluster to log
+   in to any of them.
+
+5. Launch auxiliary hosts (optional)
+
+   You can launch additional hosts in the cluster that will not act as slaves.
+   They are identical to slaves in all respects except services will not be
+   automatically started, and can be used as test clients for example.
+
+   ./bin/launch-aux [options] <master> <num auxiliary hosts>
+
+   where [options] can be one or more of:
+
+     -t <type>       instance type, default c3.8xlarge
+     -z <zone>       availability zone
+     -k <name>       keypair name, default "$USER"
+     -g <placement>  placement group, default "cluster"
+     -s <secgroup>   security group, default "default"
+     -o              on demand instance (otherwise, spot request), default no
+     -p <price>      spot request price, default $1.00
+     -m              enable monitoring, default no
+     --ami <id>      AMI ID
+
+   where <master> is the public DNS name of the master instance
+
+   where <num auxiliary hosts> is the number of auxiliary hosts to launch
+
+   More can be launched at any time by executing bin/launch-aux again.
