@@ -13,4 +13,4 @@ shift
 
 [ -z $MASTER_HOST ] && echo "usage: ssh-master <host>" && exit 1
 
-ssh $SSH_OPTS -D 1081 ec2-user@$MASTER_HOST $@
+ssh $SSH_OPTS ec2-user@$MASTER_HOST $@
