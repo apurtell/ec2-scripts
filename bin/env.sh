@@ -14,7 +14,7 @@ export HADOOP_URL=http://hbase.s3.amazonaws.com/hadoop/hadoop-${HADOOP_VERSION}.
 
 #export HBASE_VERSION=0.98.0
 #export HBASE_VERSION=0.98.6.1
-export HBASE_VERSION=0.98.7-SNAPSHOT
+export HBASE_VERSION=0.98.7
 export HBASE_URL=http://hbase.s3.amazonaws.com/hbase/hbase-hadoop-${HADOOP_VERSION}/hbase-${HBASE_VERSION}-bin.tar.gz
 
 ############################################################################
