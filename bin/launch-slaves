@@ -87,5 +87,36 @@ CMD="$CMD -b /dev/sdb=ephemeral0 -b /dev/sdc=ephemeral1 -b /dev/sdd=ephemeral2 -
 [[ ! -z "$zone" ]] && CMD="$CMD -z $zone"
 OUTPUT=`$CMD`
 echo $OUTPUT
-
 rm -f /tmp/userdata$$.gz
+
+# Get the DNS names of the slaves we launched, if they are on-demand instances.
+# Figuring out instance identifiers from spot instance requests is an extra step,
+# punt
+if [[ ! -z "$on_demand" ]] ; then
+  echo -n "Getting slave instance hostnames: "
+  declare -a hosts
+  declare -a instances
+  # compound array assignment
+  instances=(`echo $OUTPUT | tr ' ' '\n' | grep 'i\-[0-9a-f]' | grep -v ami`)
+  [[ ${#instances[@]} -ne $nrhosts ]] && echo "Error: Not enough instance identifiers found!" && exit 1
+  while true ; do
+    i=0
+    found=0
+    until [[ $i -eq $nrhosts ]] ; do
+      if [[ -z "${hosts[$i]}" ]] ; then
+        hosts[$i]=`ec2-describe-instances $TOOL_OPTS ${instances[$i]} | grep running | awk '{print $4}'`
+      else
+        ((found++))
+      fi
+      ((i++))
+    done
+    [[ $found -eq $nrhosts ]] && break
+    echo -n "."
+  done
+  echo
+  i=0
+  while [[ $i -lt $nrhosts ]] ; do
+    echo "${instances[$i]} ${hosts[$i]}"
+    ((i++))
+  done
+fi
