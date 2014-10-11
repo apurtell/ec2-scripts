@@ -801,6 +801,10 @@ cat > /etc/hbase/conf/hbase-site.xml <<EOF
  <value>120000</value>
 </property>
 <property>
+ <name>hbase.master.loadbalance.bytable</name>
+ <value>true</value>
+</property>
+<property>
  <name>hbase.security.authentication</name>
  <value>kerberos</value>
 </property>
