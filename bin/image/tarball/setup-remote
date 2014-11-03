@@ -109,6 +109,7 @@ cd /usr/lib
 wget -O ycsb.tgz $YCSB_URL
 tar xzf ycsb.tgz
 rm -f ycsb.tgz
+ln -s `find . -maxdepth 1 -name 'ycsb*' -type d` ycsb
 # Point hbase binding configuration to the local HBase configuration
 rm -rf ycsb/hbase-binding/conf/
 ln -s /etc/hbase/conf ycsb/hbase-binding/
