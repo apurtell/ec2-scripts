@@ -769,7 +769,7 @@ cat > /etc/hbase/conf/hbase-site.xml <<EOF
 </property>
 <property>
  <name>hbase.regionserver.handler.count</name>
- <value>20</value>
+ <value>256</value>
 </property>
 <property>
  <name>hbase.regionserver.metahandler.count</name>
