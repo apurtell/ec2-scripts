@@ -77,6 +77,8 @@ while true ; do
   [[ $? -eq 0 ]] && break
   sleep 1
 done
+# Set up SSH configuration on master
+ssh $SSH_OPTS ec2-user@$HOSTNAME 'echo "Host *" > ~/.ssh/config ; echo "  IdentityFile /home/ec2-user/.ssh/identity" >> ~/.ssh/config ; chmod 600 ~/.ssh/config' 
 echo
 
 echo "MASTER HOSTNAME: $HOSTNAME"
