@@ -125,8 +125,17 @@ echo "@hadoop soft nofile 65536" >> /etc/security/limits.conf
 echo "@hadoop hard nofile 65536" >> /etc/security/limits.conf
 echo "@hadoop soft nproc 65536" >> /etc/security/limits.conf
 echo "@hadoop hard nproc 65536" >> /etc/security/limits.conf
+
 echo "fs.file-max = 65536" >> /etc/sysctl.conf
+# Drop pagecache pages before touching applications
 echo "vm.swappiness = 0" >> /etc/sysctl.conf
+# Tune page cache flushing for more even behavior: background flush earlier,
+# aggressive flush later (Netflix EC2 perf tuning advice)
+echo "vm.dirty_ratio = 80" >> /etc/sysctl.conf
+echo "vm.dirty_background_ratio = 5" >> /etc/sysctl.conf
+echo "vm.dirty_expire_centisecs = 12000" >> /etc/sysctl.conf
+
+# Disable transparent huge pages
 echo "echo never > /sys/kernel/mm/transparent_hugepage/enabled" >> /etc/rc.local
 
 [[ ! -f /etc/hosts ]] &&  echo "127.0.0.1 localhost" > /etc/hosts
