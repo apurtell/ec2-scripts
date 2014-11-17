@@ -150,6 +150,9 @@ echo "net.ipv4.ip_local_port_range = 10240 65535" >> /etc/sysctl.conf
 # Disable transparent huge pages
 echo "echo never > /sys/kernel/mm/transparent_hugepage/enabled" >> /etc/rc.local
 
+# Change clock source from 'xen' to 'tsc'
+echo "echo tsc > /sys/devices/system/clocksource/clocksource0/current_clocksource" >> /etc/rc.local
+
 [[ ! -f /etc/hosts ]] &&  echo "127.0.0.1 localhost" > /etc/hosts
 
 # helper wrapper for init
@@ -176,6 +179,7 @@ chmod 755 /usr/bin/klogin
 
 sysctl -p
 echo never > /sys/kernel/mm/transparent_hugepage/enabled
+echo tsc > /sys/devices/system/clocksource/clocksource0/current_clocksource
 ulimit -n 65536
 ulimit -u 65536
 
