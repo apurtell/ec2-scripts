@@ -127,6 +127,7 @@ echo "@hadoop soft nproc 65536" >> /etc/security/limits.conf
 echo "@hadoop hard nproc 65536" >> /etc/security/limits.conf
 echo "fs.file-max = 65536" >> /etc/sysctl.conf
 echo "vm.swappiness = 0" >> /etc/sysctl.conf
+echo "echo never > /sys/kernel/mm/transparent_hugepage/enabled" >> /etc/rc.local
 
 [[ ! -f /etc/hosts ]] &&  echo "127.0.0.1 localhost" > /etc/hosts
 
@@ -152,9 +153,10 @@ chmod 755 /usr/bin/klogin
 
 # Make sure some important settings are in effect
 
+sysctl -p
+echo never > /sys/kernel/mm/transparent_hugepage/enabled
 ulimit -n 65536
 ulimit -u 65536
-sysctl -p
 
 HOSTNAME=`hostname --fqdn | awk '{print tolower($1)}'`
 HOST_IP=$(host $HOSTNAME | awk '{print $4}')
