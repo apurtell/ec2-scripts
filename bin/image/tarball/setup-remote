@@ -30,7 +30,7 @@ export PATH=$JAVA_HOME/bin:$PATH
 # Install global deps
 
 echo "Installing RPMs"
-yum -y install jsvc screen ganglia-gmetad ganglia-gmond ganglia-web httpd php lzo snappy xfsprogs krb5-server krb5-workstation
+yum -y install jsvc screen ganglia-gmetad ganglia-gmond ganglia-web httpd php lzo snappy xfsprogs krb5-server krb5-workstation atop
 
 export JSVC_HOME=/usr/bin
 
