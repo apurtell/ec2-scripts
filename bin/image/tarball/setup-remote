@@ -610,6 +610,19 @@ cat > /etc/hadoop/conf/hdfs-site.xml <<EOF
 </configuration>
 EOF
 
+####################
+# HADOOP METRICS
+
+cat >> /etc/hadoop/conf/hadoop-metrics2.properties <<EOF
+*.period=10
+*.sink.file.class=org.apache.hadoop.metrics2.sink.FileSink
+namenode.sink.file.filename=/var/log/hadoop/hdfs-namenode-metrics.log
+secondarynamenode.sink.file.filename=/var/log/hadoop/hdfs-secondarynamenode-metrics.log
+datanode.sink.file.filename=/var/log/hadoop/hdfs-datanode-metrics.log
+*.sink.ganglia.class=org.apache.hadoop.metrics2.sink.ganglia.GangliaSink31
+*.sink.ganglia.servers=$MASTER_HOST:8649
+EOF
+
 # Set up HBase configuration
 
 ####################
@@ -903,6 +916,21 @@ cat > /etc/hbase/conf/hbase-site.xml <<EOF
  <value>3600000</value>
 </property>
 </configuration>
+EOF
+
+####################
+# HADOOP METRICS
+
+cat >> /etc/hbase/conf/hadoop-metrics2.properties <<EOF
+*.period=10
+hbase.sink.file.master.class=org.apache.hadoop.metrics2.sink.FileSink
+hbase.sink.file.master.filename=/var/log/hbase/hbase-master-metrics.log
+hbase.sink.file.master.context=master
+hbase.sink.file.regionserver.class=org.apache.hadoop.metrics2.sink.FileSink
+hbase.sink.file.regionserver.filename=/var/log/hbase/hbase-regionserver-metrics.log
+hbase.sink.file.regionserver.context=regionserver
+*.sink.ganglia.class=org.apache.hadoop.metrics2.sink.ganglia.GangliaSink31
+*.sink.ganglia.servers=$MASTER_HOST:8649
 EOF
 
 ln -s /etc/hadoop/conf/core-site.xml /etc/hbase/conf/
