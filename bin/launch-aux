@@ -77,6 +77,8 @@ if [[ ! -z "$on_demand" ]] ; then
 else
   CMD="ec2-request-spot-instances $AMI $TOOL_OPTS -n $nrhosts -k $keypair -t $type -g $secgroup --placement-group $placementgroup -p $price -f /tmp/userdata$$.gz"
 fi
+# allocate a 100 GB EBS volume for /var/log, will be deleted at termination
+CMD="$CMD -b /dev/sdf=:100:true:gp2"
 # need to specify ephemeral drive mappings or they won't appear
 CMD="$CMD -b /dev/sdb=ephemeral0 -b /dev/sdc=ephemeral1 -b /dev/sdd=ephemeral2 -b /dev/sde=ephemeral3"
 [[ ! -z "$monitoring" ]] && CMD="$CMD -m"

@@ -35,6 +35,14 @@ yum -y install jsvc screen ganglia-gmetad ganglia-gmond ganglia-web httpd php lz
 export JSVC_HOME=/usr/bin
 
 ####################
+# Set up /dev/sdf as /var/svclog
+
+echo "Setting up service log volume"
+mkfs.xfs -f /dev/sdf
+mkdir -p /var/svclog
+mount -o rw,noatime,nodiratime /dev/sdf /var/svclog
+
+####################
 # Set up user accounts
 
 echo "Configuring user accounts"
@@ -60,10 +68,10 @@ wget -O hadoop.tgz $HADOOP_URL
 tar xzf hadoop.tgz
 rm -f hadoop.tgz
 ln -s `find . -maxdepth 1 -name 'hadoop*' -type d` hadoop
-mkdir /var/log/hadoop /var/run/hadoop
-chown hdfs:hadoop /var/log/hadoop /var/run/hadoop
-chmod 775 /var/log/hadoop /var/run/hadoop
-ln -s /var/log/hadoop /usr/lib/hadoop/logs
+mkdir /var/svclog/hadoop /var/run/hadoop
+chown hdfs:hadoop /var/svclog/hadoop /var/run/hadoop
+chmod 775 /var/svclog/hadoop /var/run/hadoop
+ln -s /var/svclog/hadoop /usr/lib/hadoop/logs
 # Relocate configuration
 mkdir -p /etc/hadoop/conf
 cp -a hadoop/etc/hadoop/* /etc/hadoop/conf/
@@ -84,10 +92,10 @@ wget -O hbase.tgz $HBASE_URL
 tar xzf hbase.tgz
 rm -f hbase.tgz
 ln -s `find . -maxdepth 1 -name 'hbase*' -type d` hbase
-mkdir /var/log/hbase /var/run/hbase
-chown hbase:hadoop /var/log/hbase /var/run/hbase
-chmod 775 /var/log/hbase /var/run/hbase
-ln -s /var/log/hbase /usr/lib/hbase/logs
+mkdir /var/svclog/hbase /var/run/hbase
+chown hbase:hadoop /var/svclog/hbase /var/run/hbase
+chmod 775 /var/svclog/hbase /var/run/hbase
+ln -s /var/svclog/hbase /usr/lib/hbase/logs
 # replace lib/native with a symlink to Hadoop native libs
 rm -rf /usr/lib/hbase/lib/native
 mkdir -p /usr/lib/hbase/lib/native
@@ -318,22 +326,24 @@ chmod 640 /etc/hadoop/conf/*.keytab
 # Set speculative allocation on data volumes to the HDFS block size
 mountopts="rw,noatime,nodiratime,allocsize=256m"
 
+# set up the first locally attached ephemeral drive
 m="/media/ephemeral0"
 umount $m
-mkfs.xfs -f /dev/xvdb
+mkfs.xfs -f /dev/sdb
 mkdir -p $m
-mount -o $mountopts /dev/xvdb $m
+mount -o $mountopts /dev/sdb $m
 mkdir -p $m/dfs/data $m/zk
 chmod -R 0750 $m/dfs/data
 chown -R hdfs:hadoop $m/dfs
 chown -R hbase:hadoop $m/zk
 DFS_NAME_DIR="$m/dfs/name"
 DFS_DATA_DIR="$m/dfs/data"
-mkfs.xfs -f /dev/xvdc
+mkfs.xfs -f /dev/sdc
+# we might have a second locally attached ephemeral drive
 if [[ $? -eq 0 ]] ; then
   m="/media/ephemeral1"
   mkdir -p $m
-  mount -o $mountopts /dev/xvdc $m
+  mount -o $mountopts /dev/sdc $m
   mkdir -p $m/dfs/data $m/zk
   chmod -R 0750 $m/dfs/data
   chown -R hdfs:hadoop $m/dfs
@@ -341,12 +351,14 @@ if [[ $? -eq 0 ]] ; then
   DFS_NAME_DIR="$DFS_NAME_DIR,$m/dfs/name"
   DFS_DATA_DIR="$DFS_DATA_DIR,$m/dfs/data"
   i=2
-  for d in d e f g h i ; do
-    mkfs.xfs -f /dev/xvd${d}
+  # can only have up to 4 locally attached ephemeral devices,
+  # check for two more; only use for datanode volumes
+  for d in d e ; do
+    mkfs.xfs -f /dev/sd${d}
     if [[ $? -eq 0 ]] ; then
       m="/media/ephemeral${i}"
       mkdir -p $m
-      mount -o $mountopts /dev/xvd${d} $m
+      mount -o $mountopts /dev/sd${d} $m
       mkdir -p $m/dfs/data
       chmod -R 0750 $m/dfs/data
       chown -R hdfs:hadoop $m/dfs
@@ -374,7 +386,7 @@ export HADOOP_NAMENODE_OPTS="\$HADOOP_NAMENODE_OPTS -Xms4g -Xmx4g"
 export HADOOP_NAMENODE_OPTS="\$HADOOP_NAMENODE_OPTS -XX:+UseConcMarkSweepGC"
 export HADOOP_NAMENODE_OPTS="\$HADOOP_NAMENODE_OPTS -XX:+UseParNewGC"
 export HADOOP_NAMENODE_OPTS="\$HADOOP_NAMENODE_OPTS -XX:+CMSClassUnloadingEnabled"
-export HADOOP_NAMENODE_OPTS="\$HADOOP_NAMENODE_OPTS -verbose:gc -Xloggc:/var/log/hadoop/hdfs-namenode-gc.log"
+export HADOOP_NAMENODE_OPTS="\$HADOOP_NAMENODE_OPTS -verbose:gc -Xloggc:/var/svclog/hadoop/hdfs-namenode-gc.log"
 export HADOOP_NAMENODE_OPTS="\$HADOOP_NAMENODE_OPTS -XX:+PrintGCDetails"
 export HADOOP_NAMENODE_OPTS="\$HADOOP_NAMENODE_OPTS -XX:+PrintAdaptiveSizePolicy"
 export HADOOP_NAMENODE_OPTS="\$HADOOP_NAMENODE_OPTS -XX:+PrintReferenceGC"
@@ -613,12 +625,12 @@ EOF
 ####################
 # HADOOP METRICS
 
-cat >> /etc/hadoop/conf/hadoop-metrics2.properties <<EOF
+cat > /etc/hadoop/conf/hadoop-metrics2.properties <<EOF
 *.period=10
 *.sink.file.class=org.apache.hadoop.metrics2.sink.FileSink
-namenode.sink.file.filename=/var/log/hadoop/hdfs-namenode-metrics.log
-secondarynamenode.sink.file.filename=/var/log/hadoop/hdfs-secondarynamenode-metrics.log
-datanode.sink.file.filename=/var/log/hadoop/hdfs-datanode-metrics.log
+namenode.sink.file.filename=/var/svclog/hadoop/hdfs-namenode-metrics.log
+secondarynamenode.sink.file.filename=/var/svclog/hadoop/hdfs-secondarynamenode-metrics.log
+datanode.sink.file.filename=/var/svclog/hadoop/hdfs-datanode-metrics.log
 *.sink.ganglia.class=org.apache.hadoop.metrics2.sink.ganglia.GangliaSink31
 *.sink.ganglia.servers=$MASTER_HOST:8649
 EOF
@@ -636,7 +648,7 @@ export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -Xmn256m"
 export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -XX:+UseConcMarkSweepGC"
 export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -XX:+UseParNewGC"
 export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -XX:+CMSClassUnloadingEnabled"
-export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -verbose:gc -Xloggc:/var/log/hbase/hbase-master-gc.log"
+export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -verbose:gc -Xloggc:/var/svclog/hbase/hbase-master-gc.log"
 export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -XX:+PrintGCDetails"
 export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -XX:+PrintAdaptiveSizePolicy"
 export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -XX:+PrintReferenceGC"
@@ -649,7 +661,7 @@ export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:MaxDirectMemorySiz
 export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:+UseConcMarkSweepGC"
 export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:+UseParNewGC"
 export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:+CMSClassUnloadingEnabled"
-export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -verbose:gc -Xloggc:/var/log/hbase/hbase-regionserver-gc.log"
+export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -verbose:gc -Xloggc:/var/svclog/hbase/hbase-regionserver-gc.log"
 export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:+PrintGCDetails"
 export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:+PrintAdaptiveSizePolicy"
 export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:+PrintReferenceGC"
@@ -663,7 +675,7 @@ export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -Xmn64m"
 export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -XX:+UseConcMarkSweepGC"
 export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -XX:+UseParNewGC"
 export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -XX:+CMSClassUnloadingEnabled"
-export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -verbose:gc -Xloggc:/var/log/hbase/hbase-zookeeper-gc.log"
+export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -verbose:gc -Xloggc:/var/svclog/hbase/hbase-zookeeper-gc.log"
 export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -XX:+PrintGCDetails"
 export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -XX:+PrintAdaptiveSizePolicy"
 export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -XX:+PrintReferenceGC"
@@ -921,16 +933,21 @@ EOF
 ####################
 # HADOOP METRICS
 
-cat >> /etc/hbase/conf/hadoop-metrics2.properties <<EOF
-*.period=10
-hbase.sink.file.master.class=org.apache.hadoop.metrics2.sink.FileSink
-hbase.sink.file.master.filename=/var/log/hbase/hbase-master-metrics.log
-hbase.sink.file.master.context=master
-hbase.sink.file.regionserver.class=org.apache.hadoop.metrics2.sink.FileSink
-hbase.sink.file.regionserver.filename=/var/log/hbase/hbase-regionserver-metrics.log
-hbase.sink.file.regionserver.context=regionserver
-*.sink.ganglia.class=org.apache.hadoop.metrics2.sink.ganglia.GangliaSink31
-*.sink.ganglia.servers=$MASTER_HOST:8649
+rm -f /etc/hbase/conf/hadoop-metrics2.properties
+cat > /etc/hbase/conf/hadoop-metrics2-hbase.properties <<EOF
+hbase.sink.file0.class=org.apache.hadoop.metrics2.sink.FileSink
+hbase.sink.file0.period=10
+hbase.sink.file0.context=master
+hbase.sink.file0.filename=/var/svclog/hbase/hbase-master-metrics.log
+hbase.sink.file1.class=org.apache.hadoop.metrics2.sink.FileSink
+hbase.sink.file1.period=10
+hbase.sink.file1.context=regionserver
+hbase.sink.file1.filename=/var/svclog/hbase/hbase-regionserver-metrics.log
+hbase.sink.ganglia.class=org.apache.hadoop.metrics2.sink.ganglia.GangliaSink31
+hbase.sink.ganglia.period=10
+hbase.sink.ganglia.servers=$MASTER_HOST:8649
+hbase.sink.ganglia.slope=jvm.metrics.gcCount=zero,jvm.metrics.memHeapUsedM=both
+hbase.sink.ganglia.dmax=jvm.metrics.threadsBlocked=70,jvm.metrics.memHeapUsedM=40
 EOF
 
 ln -s /etc/hadoop/conf/core-site.xml /etc/hbase/conf/
@@ -965,7 +982,7 @@ cat > /etc/hbase/conf/log4j.properties <<EOF
 hbase.root.logger=INFO,console
 hbase.security.logger=INFO,console
 hbase.security.log.file=SecurityAuth.audit
-hbase.log.dir=/var/log/hbase
+hbase.log.dir=.
 hbase.log.file=hbase.log
 log4j.rootLogger=\${hbase.root.logger}
 log4j.threshhold=ALL
