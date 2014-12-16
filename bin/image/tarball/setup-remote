@@ -122,6 +122,18 @@ ln -s `find . -maxdepth 1 -name 'ycsb*' -type d` ycsb
 rm -rf ycsb/hbase-binding/conf
 cp -a /etc/hbase/conf ycsb/hbase-binding/
 
+###################
+# Install Phoenix
+
+echo "Installing Phoenix"
+cd /usr/lib
+wget -O phoenix.tgz $PHOENIX_URL
+tar xzf phoenix.tgz
+rm -f phoenix.tgz
+ln -s `find . -maxdepth 1 -name 'phoenix*' -type d` phoenix
+# Install server jar into the HBase lib/
+( cd /usr/lib/hbase/lib ; ln -s /usr/lib/phoenix/*-server.jar . )
+
 cd ~
 
 ####################

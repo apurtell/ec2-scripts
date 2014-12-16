@@ -20,6 +20,11 @@ export HBASE_URL=http://hbase.s3.amazonaws.com/hbase/hbase-hadoop-${HADOOP_VERSI
 
 export YCSB_URL=http://hbase.s3.amazonaws.com/hbase/hbase-hadoop-${HADOOP_VERSION}/ycsb.tar.gz
 
+# The version of Phoenix to use and the distribution tarball location
+
+export PHOENIX_VERSION=4.2.2-1532
+export PHOENIX_URL=http://hbase.s3.amazonaws.com/phoenix/phoenix-hadoop-${HADOOP_VERSION}-hbase-${HBASE_VERSION}/phoenix-${PHOENIX_VERSION}.tar.gz
+
 ############################################################################
 
 # SSH options used when connecting to EC2 instances.

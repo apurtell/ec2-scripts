@@ -66,6 +66,7 @@ echo "JAVA_URL=$JAVA_URL" >> /tmp/userdata$$
 echo "HADOOP_URL=$HADOOP_URL" >> /tmp/userdata$$
 echo "HBASE_URL=$HBASE_URL" >> /tmp/userdata$$
 echo "YCSB_URL=$YCSB_URL" >> /tmp/userdata$$
+echo "PHOENIX_URL=$PHOENIX_URL" >> /tmp/userdata$$
 echo "MASTER_HOST=$MASTER_HOST" >> /tmp/userdata$$
 cat "$bin"/image/tarball/setup-slave-remote.pre >> /tmp/userdata$$
 cat "$bin"/image/tarball/setup-remote >> /tmp/userdata$$
