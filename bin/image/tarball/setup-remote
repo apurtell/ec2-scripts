@@ -638,12 +638,13 @@ EOF
 # HADOOP METRICS
 
 cat > /etc/hadoop/conf/hadoop-metrics2.properties <<EOF
-*.period=10
 *.sink.file.class=org.apache.hadoop.metrics2.sink.FileSink
+*.sink.file.period=60
 namenode.sink.file.filename=/var/svclog/hadoop/hdfs-namenode-metrics.log
 secondarynamenode.sink.file.filename=/var/svclog/hadoop/hdfs-secondarynamenode-metrics.log
 datanode.sink.file.filename=/var/svclog/hadoop/hdfs-datanode-metrics.log
 *.sink.ganglia.class=org.apache.hadoop.metrics2.sink.ganglia.GangliaSink31
+*.sink.ganglia.period=10
 *.sink.ganglia.servers=$MASTER_HOST:8649
 EOF
 
@@ -948,11 +949,11 @@ EOF
 rm -f /etc/hbase/conf/hadoop-metrics2.properties
 cat > /etc/hbase/conf/hadoop-metrics2-hbase.properties <<EOF
 hbase.sink.file0.class=org.apache.hadoop.metrics2.sink.FileSink
-hbase.sink.file0.period=10
+hbase.sink.file0.period=60
 hbase.sink.file0.context=master
 hbase.sink.file0.filename=/var/svclog/hbase/hbase-master-metrics.log
 hbase.sink.file1.class=org.apache.hadoop.metrics2.sink.FileSink
-hbase.sink.file1.period=10
+hbase.sink.file1.period=60
 hbase.sink.file1.context=regionserver
 hbase.sink.file1.filename=/var/svclog/hbase/hbase-regionserver-metrics.log
 hbase.sink.ganglia.class=org.apache.hadoop.metrics2.sink.ganglia.GangliaSink31
