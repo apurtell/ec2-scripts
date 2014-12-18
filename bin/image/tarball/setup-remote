@@ -667,6 +667,7 @@ export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -XX:+PrintAdaptiveSizePolicy"
 export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -XX:+PrintReferenceGC"
 export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -XX:+ParallelRefProcEnabled"
 export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -XX:ParallelGCThreads=16"
+export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -XX:+UnlockCommercialFeatures -XX:+FlightRecorder -XX:StartFlightRecording=name=MyRecording,settings=default,filename=/var/svclog/hbase/hbase-master-events.jf"
 
 export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -Xms8g -Xmx8g"
 export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -Xmn256m"
@@ -680,6 +681,7 @@ export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:+PrintAdaptiveSize
 export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:+PrintReferenceGC"
 export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:+ParallelRefProcEnabled"
 export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:ParallelGCThreads=16"
+export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:+UnlockCommercialFeatures -XX:+FlightRecorder -XX:StartFlightRecording=name=MyRecording,settings=default,filename=/var/svclog/hbase/hbase-regionserver-events.jf"
 # uncomment to enable the lightweight java profiling agent
 # export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -agentpath:\$JAVA_HOME/jre/lib/amd64/liblagent.so"
 
