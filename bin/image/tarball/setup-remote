@@ -873,6 +873,14 @@ cat > /etc/hbase/conf/hbase-site.xml <<EOF
  <value>true</value>
 </property>
 <property>
+ <name>hbase.regionserver.compaction.private.readers</name>
+ <value>true</value>
+</property>
+<property>
+ <name>hbase.hstore.min.locality.to.skip.major.compact</name>
+ <value>0.75</value>
+</property>
+<property>
  <name>replication.source.ratio</name>
  <value>0.15</value>
 </property>
