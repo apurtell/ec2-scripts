@@ -43,7 +43,7 @@ case $REGION in
   'us-west-2') AMI="ami-8786c6b7";;
 esac
 
-JAVA_VERSION=7u67
+#JAVA_VERSION=7u79
 #JAVA_VERSION=8u20
-#JAVA_VERSION=8u40
+JAVA_VERSION=8u45
 JAVA_URL=http://hbase.s3.amazonaws.com/jdk/jdk-${JAVA_VERSION}-linux-x64.tar.gz
