@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+bin=`dirname "$0"`
+bin=`cd "$bin"; pwd`
+export bin
+[[ -f "$bin"/credentials.sh ]] && source "$bin"/credentials.sh
+source "$bin"/env.sh
+
+echo "HADOOP_URL $HADOOP_URL"
+echo "HBASE_URL $HBASE_URL"
+echo "YCSB_URL $YCSB_URL"
+echo "PHOENIX_URL $PHOENIX_URL"
+echo "JAVA_URL $JAVA_URL"
