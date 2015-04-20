@@ -6,13 +6,13 @@ REGION=${REGION:-us-west-2}
 
 # The version of Hadoop to use and the distribution tarball location
 
-export HADOOP_VERSION=2.4.1
+export HADOOP_VERSION=2.5.2
 #export HADOOP_VERSION=2.2.0
 export HADOOP_URL=http://hbase.s3.amazonaws.com/hadoop/hadoop-${HADOOP_VERSION}.tar.gz
 
 # The version of HBase to use and the distribution tarball location
 
-export HBASE_VERSION=0.98.9
+export HBASE_VERSION=0.98.12
 #export HBASE_VERSION=0.98.0
 export HBASE_URL=http://hbase.s3.amazonaws.com/hbase/hbase-hadoop-${HADOOP_VERSION}/hbase-${HBASE_VERSION}-bin.tar.gz
 
@@ -22,7 +22,7 @@ export YCSB_URL=http://hbase.s3.amazonaws.com/hbase/hbase-hadoop-${HADOOP_VERSIO
 
 # The version of Phoenix to use and the distribution tarball location
 
-export PHOENIX_VERSION=4.2.2-1532
+export PHOENIX_VERSION=4.3.1
 export PHOENIX_URL=http://hbase.s3.amazonaws.com/phoenix/phoenix-hadoop-${HADOOP_VERSION}-hbase-${HBASE_VERSION}/phoenix-${PHOENIX_VERSION}.tar.gz
 
 ############################################################################
