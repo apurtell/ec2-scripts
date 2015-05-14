@@ -506,6 +506,10 @@ cat > /etc/hadoop/conf/hdfs-site.xml <<EOF
  <value>true</value>
 </property>
 <property>
+ <name>dfs.datanode.failed.volumes.tolerated</name>
+ <value>1</value>
+</property>
+<property>
  <name>dfs.namenode.avoid.stale.read.datanode</name>
  <value>true</value>
 </property>
@@ -884,6 +888,10 @@ cat > /etc/hbase/conf/hbase-site.xml <<EOF
 <property>
  <name>hbase.master.loadbalance.bytable</name>
  <value>true</value>
+</property>
+<property>
+ <name>hbase.master.wait.on.regionservers.timeout</name>
+ <value>30000</value>
 </property>
 <property>
  <name>hbase.security.authentication</name>
