@@ -7,7 +7,7 @@ placementgroup=cluster
 monitoring=
 zone=
 ami=
-keypair=`whoami`
+keypair=
 
 while [[ $# -gt 0 ]] ; do
   case "$1" in
@@ -28,16 +28,21 @@ done
 bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
 export bin
-[[ -f "$bin"/credentials.sh ]] && source "$bin"/credentials.sh
 source "$bin"/env.sh
+[[ -f "$bin"/credentials.sh ]] && source "$bin"/credentials.sh
 
 echo "TYPE: $type"
 
-[[ ! -z $ami ]] && AMI=$ami
+[[ ! -z "$ami" ]] && AMI=$ami
 
 echo "AMI: $AMI"
 
-[[ -z $AMI ]] && echo "No AMI found" && exit 1
+[[ -z "$AMI" ]] && echo "No AMI found" && exit 1
+
+if [[ -z "$keypair" ]] ; then
+  keypair=${EC2_KEYNAME:=`whoami`}
+fi
+echo "KEYNAME: $keypair"
 
 rm -f /tmp/userdata$$
 echo "#!/bin/bash" >> /tmp/userdata$$
@@ -51,7 +56,7 @@ cat "$bin"/image/tarball/setup-remote >> /tmp/userdata$$
 cat "$bin"/image/tarball/setup-master-remote.post >> /tmp/userdata$$
 gzip -9 /tmp/userdata$$
 
-CMD="ec2-run-instances $AMI $TOOL_OPTS -k $keypair -t $type -g $secgroup --placement-group $placementgroup -f /tmp/userdata$$.gz"
+CMD="ec2-run-instances $AMI --region $REGION --aws-access-key $AWS_ACCESS_KEY --aws-secret-key $AWS_SECRET_KEY --request-timeout $REQUEST_TIMEOUT -k $keypair -t $type -g $secgroup --placement-group $placementgroup -f /tmp/userdata$$.gz"
 # allocate a 100 GB EBS volume for /var/log, will be deleted at termination
 CMD="$CMD -b /dev/sdf=:100:true:gp2"
 # need to specify ephemeral drive mappings or they won't appear
@@ -67,7 +72,7 @@ rm -f /tmp/userdata$$.gz
 echo -n "Polling server status "
 while true; do
   printf "."
-  HOSTNAME=`ec2-describe-instances $TOOL_OPTS $INSTANCE | grep running | awk '{print $4}'`
+  HOSTNAME=`ec2-describe-instances --region $REGION --aws-access-key $AWS_ACCESS_KEY --aws-secret-key $AWS_SECRET_KEY --request-timeout $REQUEST_TIMEOUT $INSTANCE | grep running | awk '{print $4}'`
   [[ ! -z $HOSTNAME ]] && break;
   sleep 1
 done
@@ -76,12 +81,12 @@ echo
 echo -n "Uploading private key "
 while true ; do
   printf "."
-  scp $SSH_OPTS $EC2_PRIVATE_KEY ec2-user@$HOSTNAME:~/.ssh/identity > /dev/null 2>&1
+  scp -i $EC2_PRIVATE_KEY $SSH_OPTS $EC2_PRIVATE_KEY ec2-user@$HOSTNAME:~/.ssh/identity > /dev/null 2>&1
   [[ $? -eq 0 ]] && break
   sleep 1
 done
 # Set up SSH configuration on master
-ssh $SSH_OPTS ec2-user@$HOSTNAME 'echo "Host *" > ~/.ssh/config ; echo "  IdentityFile /home/ec2-user/.ssh/identity" >> ~/.ssh/config ; chmod 600 ~/.ssh/config' 
+ssh -i $EC2_PRIVATE_KEY $SSH_OPTS ec2-user@$HOSTNAME 'echo "Host *" > ~/.ssh/config ; echo "  IdentityFile /home/ec2-user/.ssh/identity" >> ~/.ssh/config ; chmod 600 ~/.ssh/config' 
 echo
 
 echo "MASTER HOSTNAME: $HOSTNAME"

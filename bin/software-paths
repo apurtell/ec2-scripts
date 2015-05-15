@@ -3,8 +3,8 @@
 bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
 export bin
-[[ -f "$bin"/credentials.sh ]] && source "$bin"/credentials.sh
 source "$bin"/env.sh
+[[ -f "$bin"/credentials.sh ]] && source "$bin"/credentials.sh
 
 echo "HADOOP_URL $HADOOP_URL"
 echo "HBASE_URL $HBASE_URL"

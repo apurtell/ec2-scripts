@@ -10,7 +10,7 @@ price=1.0
 zone=
 ami=
 on_demand=
-keypair=`whoami`
+keypair=
 
 while [[ $# -gt 0 ]] ; do
   case "$1" in
@@ -48,21 +48,26 @@ fi
 bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
 export bin
+source "$bin"/env.sh
 if [[ -f "$bin"/credentials.sh ]] ; then
   source "$bin"/credentials.sh
 fi
-source "$bin"/env.sh
 
 echo "TYPE: $type"
 echo "MASTER_HOST: $MASTER_HOST"
 
-if [[ ! -z $ami ]] ; then
+if [[ ! -z "$ami" ]] ; then
   AMI=$ami
 fi
 
 echo "AMI: $AMI"
 
-[[ -z $AMI ]] && echo "No AMI found" && exit 1
+[[ -z "$AMI" ]] && echo "No AMI found" && exit 1
+
+if [[ -z "$keypair" ]] ; then
+  keypair=${EC2_KEYNAME:=`whoami`}
+fi
+echo "KEYNAME: $keypair"
 
 rm -f /tmp/userdata$$
 echo "#!/bin/bash" >> /tmp/userdata$$
@@ -78,9 +83,9 @@ cat "$bin"/image/tarball/setup-slave-remote.post >> /tmp/userdata$$
 gzip -9 /tmp/userdata$$
 
 if [[ ! -z "$on_demand" ]] ; then
-  CMD="ec2-run-instances $AMI $TOOL_OPTS -n $nrhosts -k $keypair -t $type -g $secgroup --placement-group $placementgroup -f /tmp/userdata$$.gz"
+  CMD="ec2-run-instances $AMI --region $REGION --aws-access-key $AWS_ACCESS_KEY --aws-secret-key $AWS_SECRET_KEY --request-timeout $REQUEST_TIMEOUT -n $nrhosts -k $keypair -t $type -g $secgroup --placement-group $placementgroup -f /tmp/userdata$$.gz"
 else
-  CMD="ec2-request-spot-instances $AMI $TOOL_OPTS -n $nrhosts -k $keypair -t $type -g $secgroup --placement-group $placementgroup -p $price -f /tmp/userdata$$.gz"
+  CMD="ec2-request-spot-instances $AMI --region $REGION --aws-access-key $AWS_ACCESS_KEY --aws-secret-key $AWS_SECRET_KEY --request-timeout $REQUEST_TIMEOUT -n $nrhosts -k $keypair -t $type -g $secgroup --placement-group $placementgroup -p $price -f /tmp/userdata$$.gz"
 fi
 # allocate a 100 GB EBS volume for /var/log, will be deleted at termination
 CMD="$CMD -b /dev/sdf=:100:true:gp2"
@@ -107,7 +112,7 @@ if [[ ! -z "$on_demand" ]] ; then
     found=0
     until [[ $i -eq $nrhosts ]] ; do
       if [[ -z "${hosts[$i]}" ]] ; then
-        hosts[$i]=`ec2-describe-instances $TOOL_OPTS ${instances[$i]} | grep running | awk '{print $4}'`
+        hosts[$i]=`ec2-describe-instances --region $REGION --aws-access-key $AWS_ACCESS_KEY --aws-secret-key $AWS_SECRET_KEY --request-timeout $REQUEST_TIMEOUT ${instances[$i]} | grep running | awk '{print $4}'`
       else
         ((found++))
       fi

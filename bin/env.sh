@@ -28,13 +28,10 @@ export PHOENIX_URL=http://hbase.s3.amazonaws.com/phoenix/phoenix-hadoop-${HADOOP
 ############################################################################
 
 # SSH options used when connecting to EC2 instances.
-SSH_OPTS=`echo -q -i $EC2_PRIVATE_KEY -o StrictHostKeyChecking=no -o ServerAliveInterval=30`
+SSH_OPTS="-q -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
 # EC2 command request timeout (seconds)
 REQUEST_TIMEOUT=120    # 2 minutes
-
-# Global tool options
-TOOL_OPTS=`echo --region $REGION --aws-access-key $AWS_ACCESS_KEY --aws-secret-key $AWS_SECRET_KEY --request-timeout $REQUEST_TIMEOUT`
 
 # Amazon Linux AMI 2014.09 (HVM)
 case $REGION in

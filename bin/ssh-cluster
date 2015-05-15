@@ -3,14 +3,14 @@
 bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
 export bin
+source "$bin"/env.sh
 if [ -f "$bin"/credentials.sh ] ; then
   source "$bin"/credentials.sh
 fi
-. "$bin"/env.sh
 
 MASTER_HOST=$1
 shift
 
 [ -z $MASTER_HOST ] && echo "usage: ssh-master <host>" && exit 1
 
-ssh $SSH_OPTS ec2-user@$MASTER_HOST $@
+ssh -i $EC2_PRIVATE_KEY $SSH_OPTS ec2-user@$MASTER_HOST $@
