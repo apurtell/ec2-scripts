@@ -510,6 +510,10 @@ cat > /etc/hadoop/conf/hdfs-site.xml <<EOF
  <value>1</value>
 </property>
 <property>
+ <name>dfs.namenode.acls.enabled</name>
+ <value>true</value>
+</property>
+<property>
  <name>dfs.namenode.avoid.stale.read.datanode</name>
  <value>true</value>
 </property>
