@@ -44,5 +44,6 @@ case $REGION in
 esac
 
 #JAVA_VERSION=7u79
-JAVA_VERSION=8u45
+#JAVA_VERSION=8u45
+JAVA_VERSION=8u60-apurtell-8086706
 JAVA_URL=http://hbase.s3.amazonaws.com/jdk/jdk-${JAVA_VERSION}-linux-x64.tar.gz
