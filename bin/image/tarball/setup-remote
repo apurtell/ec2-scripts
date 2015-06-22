@@ -134,6 +134,16 @@ ln -s `find . -maxdepth 1 -name 'phoenix*' -type d` phoenix
 # Install server jar into the HBase lib/
 ( cd /usr/lib/hbase/lib ; ln -s /usr/lib/phoenix/*-server.jar . )
 
+###################
+# Install Spark
+
+echo "Installing Spark"
+cd /usr/lib
+wget -O spark.tgz $SPARK_URL
+tar xzf spark.tgz
+rm -f spark.tgz
+ln -s `find . -maxdepth 1 -name 'spark*' -type d` spark
+
 cd ~
 
 ####################
