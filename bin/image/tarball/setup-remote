@@ -532,6 +532,10 @@ cat > /etc/hadoop/conf/hdfs-site.xml <<EOF
  <value>true</value>
 </property>
 <property>
+  <name>dfs.namenode.max.extra.edits.segments.retained</name>
+  <value>1</value>
+</property>
+<property>
  <name>dfs.datanode.data.dir.perm</name>
  <value>750</value> 
 </property>
