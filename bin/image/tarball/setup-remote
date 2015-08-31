@@ -404,8 +404,12 @@ kinit=`which kinit`
 cat > /etc/hadoop/conf/hadoop-env.sh <<EOF
 export JAVA_HOME=/usr/java/latest
 
-COMMON_HDFS_OPTS="\$COMMON_HDFS_OPTS -XX:+UseG1GC"
-COMMON_HDFS_OPTS="\$COMMON_HDFS_OPTS -XX:MaxGCPauseMillis=100"
+COMMON_HDFS_OPTS="\$COMMON_HDFS_OPTS -XX:+UseConcMarkSweepGC"
+COMMON_HDFS_OPTS="\$COMMON_HDFS_OPTS -XX:+UseParNewGC"
+COMMON_HDFS_OPTS="\$COMMON_HDFS_OPTS -XX:CMSInitiatingOccupancyFraction=70"
+COMMON_HDFS_OPTS="\$COMMON_HDFS_OPTS -XX:+UseCMSInitiatingOccupancyOnly"
+#COMMON_HDFS_OPTS="\$COMMON_HDFS_OPTS -XX:+UseG1GC"
+#COMMON_HDFS_OPTS="\$COMMON_HDFS_OPTS -XX:MaxGCPauseMillis=100"
 COMMON_HDFS_OPTS="\$COMMON_HDFS_OPTS -XX:+PrintGCDetails"
 COMMON_HDFS_OPTS="\$COMMON_HDFS_OPTS -XX:+PrintGCDateStamps"
 COMMON_HDFS_OPTS="\$COMMON_HDFS_OPTS -XX:+PrintGCTimeStamps"
@@ -416,15 +420,15 @@ COMMON_HDFS_OPTS="\$COMMON_HDFS_OPTS -XX:+TieredCompilation"
 
 export HADOOP_OPTS="\$HADOOP_OPTS -Djavax.security.auth.useSubjectCredsOnly=false"
 
-export HADOOP_NAMENODE_OPTS="\$HADOOP_NAMENODE_OPTS -Xms4g -Xmx4g"
+export HADOOP_NAMENODE_OPTS="\$HADOOP_NAMENODE_OPTS -Xms4g -Xmx4g -Xmn512m"
 export HADOOP_NAMENODE_OPTS="\$HADOOP_NAMENODE_OPTS \$COMMON_HDFS_OPTS"
 export HADOOP_NAMENODE_OPTS="\$HADOOP_NAMENODE_OPTS -verbose:gc -Xloggc:/var/svclog/hadoop/hdfs-namenode-gc.log"
 
-export HADOOP_SECONDARYNAMENODE_OPTS="\$HADOOP_SECONDARYNAMENODE_OPTS -Xms4g -Xmx4g"
+export HADOOP_SECONDARYNAMENODE_OPTS="\$HADOOP_SECONDARYNAMENODE_OPTS -Xms4g -Xmx4g -Xmn512m"
 export HADOOP_SECONDARYNAMENODE_OPTS="\$HADOOP_SECONDARYNAMENODE_OPTS \$COMMON_HDFS_OPTS"
 export HADOOP_SECONDARYNAMENODE_OPTS="\$HADOOP_SECONDARYNAMENODE_OPTS -verbose:gc -Xloggc:/var/svclog/hadoop/hdfs-secondarynamenode-gc.log"
 
-export HADOOP_DATANODE_OPTS="\$HADOOP_DATANODE_OPTS -Xms1g -Xmx1g"
+export HADOOP_DATANODE_OPTS="\$HADOOP_DATANODE_OPTS -Xms1g -Xmx1g -Xmn512m"
 export HADOOP_DATANODE_OPTS="\$HADOOP_DATANODE_OPTS \$COMMON_HDFS_OPTS"
 export HADOOP_DATANODE_OPTS="\$HADOOP_DATANODE_OPTS -verbose:gc -Xloggc:/var/svclog/hadoop/hdfs-datanode-gc.log"
 
@@ -702,8 +706,12 @@ EOF
 cat >> /etc/hbase/conf/hbase-env.sh <<EOF
 export JAVA_HOME=/usr/java/latest
 
-COMMON_HBASE_OPTS="\$COMMON_HBASE_OPTS -XX:+UseG1GC"
-COMMON_HBASE_OPTS="\$COMMON_HBASE_OPTS -XX:MaxGCPauseMillis=100"
+COMMON_HBASE_OPTS="\$COMMON_HBASE_OPTS -XX:+UseConcMarkSweepGC"
+COMMON_HBASE_OPTS="\$COMMON_HBASE_OPTS -XX:+UseParNewGC"
+COMMON_HBASE_OPTS="\$COMMON_HBASE_OPTS -XX:CMSInitiatingOccupancyFraction=70"
+COMMON_HBASE_OPTS="\$COMMON_HBASE_OPTS -XX:+UseCMSInitiatingOccupancyOnly"
+#COMMON_HBASE_OPTS="\$COMMON_HBASE_OPTS -XX:+UseG1GC"
+#COMMON_HBASE_OPTS="\$COMMON_HBASE_OPTS -XX:MaxGCPauseMillis=100"
 COMMON_HBASE_OPTS="\$COMMON_HBASE_OPTS -XX:+PrintGCDetails"
 COMMON_HBASE_OPTS="\$COMMON_HBASE_OPTS -XX:+PrintGCDateStamps"
 COMMON_HBASE_OPTS="\$COMMON_HBASE_OPTS -XX:+PrintGCTimeStamps"
@@ -715,20 +723,18 @@ COMMON_HBASE_OPTS="\$COMMON_HBASE_OPTS -XX:+TieredCompilation"
 export HBASE_OPTS="-Djava.security.auth.login.config=/etc/hbase/conf/jaas.conf"
 export HBASE_MANAGES_ZK=true
 
-export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -Xms4g -Xmx4g"
+export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -Xms4g -Xmx4g -Xmn512m"
 export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS \$COMMON_HBASE_OPTS"
 export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -verbose:gc -Xloggc:/var/svclog/hbase/hbase-master-gc.log"
 
-export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -Xms8g -Xmx8g"
+export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -Xms8g -Xmx8g -Xmn512m"
 export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS \$COMMON_HBASE_OPTS"
 export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:MaxDirectMemorySize=24g"
 export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -verbose:gc -Xloggc:/var/svclog/hbase/hbase-regionserver-gc.log"
-# uncomment to enable the lightweight java profiling agent
-# export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -agentpath:\$JAVA_HOME/jre/lib/amd64/liblagent.so"
 # uncomment to enable flight recorder
 # export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:+UnlockCommercialFeatures -XX:+FlightRecorder"
 
-export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -Xms1g -Xmx1g"
+export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -Xms1g -Xmx1g -Xmn512m"
 export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS \$COMMON_HBASE_OPTS"
 export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -verbose:gc -Xloggc:/var/svclog/hbase/hbase-zookeeper-gc.log"
 export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -Dzookeeper.kerberos.removeHostFromPrincipal=true"
