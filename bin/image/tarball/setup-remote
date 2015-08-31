@@ -877,7 +877,13 @@ cat > /etc/hbase/conf/hbase-site.xml <<EOF
 </property>
 <property>
  <name>hbase.regionserver.handler.count</name>
- <value>256</value>
+ <!-- approximately cores x spindles -->
+ <value>64</value>
+</property>
+<property>
+ <name>hbase.client.scanner.max.result.size</name>
+ <!-- result.size x handler.count <= survivor space (~51MB with -Xmn512m) -->
+ <value>835584</value>
 </property>
 <property>
  <name>hbase.regionserver.metahandler.count</name>
