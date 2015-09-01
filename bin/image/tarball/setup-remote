@@ -162,8 +162,9 @@ echo "vm.swappiness = 0" >> /etc/sysctl.conf
 # Tune page cache flushing for more even behavior: background flush earlier,
 # aggressive flush later (Netflix EC2 perf tuning advice)
 echo "vm.dirty_ratio = 80" >> /etc/sysctl.conf
-echo "vm.dirty_background_ratio = 5" >> /etc/sysctl.conf
 echo "vm.dirty_expire_centisecs = 12000" >> /etc/sysctl.conf
+# Set background ratio very low since most data will be immutable
+echo "vm.dirty_background_ratio = 1" >> /etc/sysctl.conf
 # Up-tune networking for servers (Netflix EC2 perf tuning advice)
 echo "net.core.somaxconn = 1000" >> /etc/sysctl.conf
 echo "net.core.netdev_max_backlog = 5000" >> /etc/sysctl.conf
