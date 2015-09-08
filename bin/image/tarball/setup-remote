@@ -450,6 +450,7 @@ cat > /etc/hadoop/conf/core-site.xml <<EOF
  <name>fs.default.name</name>
  <value>hdfs://$MASTER_HOST:8020</value>
 </property>
+<!--
 <property>
  <name>hadoop.security.authentication</name>
  <value>kerberos</value>
@@ -458,6 +459,7 @@ cat > /etc/hadoop/conf/core-site.xml <<EOF
  <name>hadoop.security.authorization</name>
  <value>true</value>
 </property>
+-->
 <property>
  <name>hadoop.kerberos.kinit.command</name>
  <value>$kinit</value>
@@ -546,15 +548,15 @@ cat > /etc/hadoop/conf/hdfs-site.xml <<EOF
 </property>
 <property>
  <name>dfs.datanode.address</name>
- <value>0.0.0.0:1004</value>
+ <value>0.0.0.0:8004</value>
 </property>
 <property>
  <name>dfs.datanode.http.address</name>
- <value>0.0.0.0:1006</value>
+ <value>0.0.0.0:8006</value>
 </property>
 <property>
  <name>dfs.datanode.https.address</name>
- <value>0.0.0.0:1005</value>
+ <value>0.0.0.0:8005</value>
 </property>
 <property>
  <name>ignore.secure.ports.for.testing</name>
@@ -686,23 +688,23 @@ EOF
 ####################
 # HBASE ENV
 
-cat >> /etc/hbase/conf/jaas.conf <<EOF
-Server {
-  com.sun.security.auth.module.Krb5LoginModule required
-  useKeyTab=true
-  keyTab="/etc/hbase/conf/hbase.keytab"
-  storeKey=true
-  useTicketCache=false
-  principal="zookeeper/$HOSTNAME";
-};
-Client {
-  com.sun.security.auth.module.Krb5LoginModule required
-  useKeyTab=true
-  useTicketCache=false
-  keyTab="/etc/hbase/conf/hbase.keytab"
-  principal="hbase/$HOSTNAME";
-};
-EOF
+#cat >> /etc/hbase/conf/jaas.conf <<EOF
+#Server {
+#  com.sun.security.auth.module.Krb5LoginModule required
+#  useKeyTab=true
+#  keyTab="/etc/hbase/conf/hbase.keytab"
+#  storeKey=true
+#  useTicketCache=false
+#  principal="zookeeper/$HOSTNAME";
+#};
+#Client {
+#  com.sun.security.auth.module.Krb5LoginModule required
+#  useKeyTab=true
+#  useTicketCache=false
+#  keyTab="/etc/hbase/conf/hbase.keytab"
+#  principal="hbase/$HOSTNAME";
+#};
+#EOF
 
 cat >> /etc/hbase/conf/hbase-env.sh <<EOF
 export JAVA_HOME=/usr/java/latest
@@ -721,7 +723,8 @@ COMMON_HBASE_OPTS="\$COMMON_HBASE_OPTS -XX:+PrintReferenceGC"
 COMMON_HBASE_OPTS="\$COMMON_HBASE_OPTS -XX:+ParallelRefProcEnabled"
 COMMON_HBASE_OPTS="\$COMMON_HBASE_OPTS -XX:+TieredCompilation"
 
-export HBASE_OPTS="-Djava.security.auth.login.config=/etc/hbase/conf/jaas.conf"
+#export HBASE_OPTS="-Djava.security.auth.login.config=/etc/hbase/conf/jaas.conf"
+export HBASE_OPTS=""
 export HBASE_MANAGES_ZK=true
 
 export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -Xms4g -Xmx4g -Xmn512m"
@@ -953,6 +956,7 @@ cat > /etc/hbase/conf/hbase-site.xml <<EOF
  <name>hbase.master.wait.on.regionservers.timeout</name>
  <value>30000</value>
 </property>
+<!--
 <property>
  <name>hbase.security.authentication</name>
  <value>kerberos</value>
@@ -1009,6 +1013,7 @@ cat > /etc/hbase/conf/hbase-site.xml <<EOF
  <name>hbase.zookeeper.property.jaasLoginRenew</name>
  <value>3600000</value>
 </property>
+-->
 </configuration>
 EOF
 
