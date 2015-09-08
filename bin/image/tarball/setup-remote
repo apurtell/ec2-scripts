@@ -728,10 +728,13 @@ export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -Xms4g -Xmx4g -Xmn512m"
 export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS \$COMMON_HBASE_OPTS"
 export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -verbose:gc -Xloggc:/var/svclog/hbase/hbase-master-gc.log"
 
-export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -Xms8g -Xmx8g -Xmn512m"
+export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -Xms32g -Xmx32g -Xmn512m"
 export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS \$COMMON_HBASE_OPTS"
-export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:MaxDirectMemorySize=24g"
 export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -verbose:gc -Xloggc:/var/svclog/hbase/hbase-regionserver-gc.log"
+
+# uncomment to reserve direct memory for off heap blockcache
+# export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:MaxDirectMemorySize=24g"
+
 # uncomment to enable flight recorder
 # export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:+UnlockCommercialFeatures -XX:+FlightRecorder"
 
@@ -828,6 +831,7 @@ cat > /etc/hbase/conf/hbase-site.xml <<EOF
  <name>hbase.it.clustermanager.hbase.conf.dir</name>
  <value>/etc/hbase/conf</value>
 </property>
+<!-- uncomment to enable off heap blockcache 
 <property>
  <name>hbase.bucketcache.ioengine</name>
  <value>offheap</value>
@@ -836,6 +840,7 @@ cat > /etc/hbase/conf/hbase-site.xml <<EOF
  <name>hbase.bucketcache.size</name>
  <value>0.9</value>
 </property>
+-->
 <property>
  <name>dfs.client.block.write.replace-datanode-on-failure.enable</name>
  <value>false</value>
