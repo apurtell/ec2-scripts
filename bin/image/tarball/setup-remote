@@ -739,6 +739,11 @@ export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -verbose:gc -Xloggc:/v
 # uncomment to enable flight recorder
 # export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:+UnlockCommercialFeatures -XX:+FlightRecorder"
 
+# also uncomment to improve the fidelity of the JFR method profiler, see
+#   http://hirt.se/blog/?p=609
+#   (also useful when using Richard Warburton's honest-profiler)
+# export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -XX:+UnlockDiagnosticVMOptions -XX:+DebugNonSafepoints"
+
 export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -Xms1g -Xmx1g -Xmn512m"
 export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS \$COMMON_HBASE_OPTS"
 export HBASE_ZOOKEEPER_OPTS="\$HBASE_ZOOKEEPER_OPTS -verbose:gc -Xloggc:/var/svclog/hbase/hbase-zookeeper-gc.log"
